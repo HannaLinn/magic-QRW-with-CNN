@@ -1,0 +1,39 @@
+An initial plan for the recreation:
+
+** Questions: **
+How to mark start and finishing node? Give attributes in networkx? No, just numbers 0 and 1
+How to add decoherence, noise Melnikov 2020? 
+
+** Generate graphs: **
+with NetworkX
+handy methods:
+cycle_graph(n[, create_using]) # sorts the nodes, does not work
+adjecency matrix: A = nx.to_numpy_matrix(G)
+generate cayley graphs? (sage does not work)
+
+** Classical case: **
+simulate eq (3) Melnikov 2019
+
+** Quantum case: **
+two ways
+
+1. Qutip with Hamiltonian from eq (4) Melnikov 2019
+
+compare time when pq > pth and pc > pth (pth is thresh hold or hiting time)
+
+** Corpus: **
+Make a class for the graphs that runs the simulations and categorises.
+__init__():
+	n = number of nodes
+	A = Adjecency matrix (without sink)
+	quantum_advantage = True/False, one-hot
+
+More attributes to massage in TF?
+
+A function for calculating distance between t and i.
+
+** CNN: **
+TensorFlow with Keras
+two classes: c and q
+
+adding costum layers in Keras
