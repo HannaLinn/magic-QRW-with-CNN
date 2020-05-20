@@ -6,11 +6,12 @@ Created on Mon May 18 08:57:50 2020
 """
 
 '''
+Eq 6 and 7 in preprocessing.
+n conv filters fixed.
+
 TO DO:
-1. Wrong loss function, fixed (?), use from_logits=True?
-2. Add convolutional filters
 3. single batch of 3 examples per epoch, translated to batch size of 3
-4. add conv layers
+4. val test set
 '''
 
 import tensorflow as tf
@@ -25,10 +26,9 @@ verbose = True
 
 largest_n = 8 # n is number if nodes in the graphs
 smallest_n = 5
-epochs = 100
-N=100 # number of random generated graphs
-
-
+epochs = 200
+N=1000 # number of random generated graphs
+#filters = 100
 
 def np_edge_to_edge(A):
     n = len(A)
@@ -61,10 +61,12 @@ for it in range(smallest_n, largest_n):
         x = corpus.corpus_list[i].A
         #print(x)
         # 1. ETE
-        x = np_edge_to_edge(x)
+        #for j in range(filters): does not work, values gets too large
+        x = np_edge_to_edge(x) # does not help, same accuracy
         #print(x)
         # 2. ETV
-        x = np_edge_to_vertex(x)
+        #for j in range(filters): does not work, values gets too large
+        x = np_edge_to_vertex(x) # does not help, same accuracy
         #print(x)
         data_X[i] = x # numpy array
         data_labels[i] = corpus.corpus_list[i].label # 2 dim np array, categorical
@@ -73,15 +75,14 @@ for it in range(smallest_n, largest_n):
     data_X = data_X.reshape(N, n, n, 1) # [samples, rows, columns, channels]
     test_size = 0.1
     X_train, X_test, y_train, y_test = train_test_split(data_X, data_labels, test_size=test_size)
+    val_test_size = 0.5
+    X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=val_test_size)
     
-    
-    inputs = tf.keras.Input(shape=(n,n,1)) # shape?
+    inputs = tf.keras.Input(shape=(n,n,1))
 
-    
-    x = tf.keras.layers.Conv2D(1, (3,3))(inputs)
     # 3. 3x3 Conv2D n times
-    #for i in range(n):
-    x = tf.keras.layers.Conv2D(1, (3,3))(x)
+    x = tf.keras.layers.Conv2D(n, (3,3))(inputs)
+    
     # 4. Fully connected
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(3*n, activation='relu')(x) # according to Melnikov 2020
@@ -102,7 +103,7 @@ for it in range(smallest_n, largest_n):
                   metrics=['accuracy'])
 
     # validation split??
-    history = model.fit(X_train, y_train, validation_data = (X_test, y_test), epochs=epochs, verbose=verbose)
+    history = model.fit(X_train, y_train, validation_data = (X_val, y_val), epochs=epochs, verbose=verbose)
     
     
     test_loss, test_acc = model.evaluate(X_test,  y_test, verbose=2)
