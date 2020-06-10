@@ -15,7 +15,7 @@ from tensorflow.keras import layers, models, regularizers, constraints
 import numpy as np
 
 import matplotlib.pyplot as plt
-from corpus_v6 import *
+from corpus_random_percentage import *
 from sklearn.model_selection import train_test_split
 import time
 
@@ -68,7 +68,7 @@ class ETE_ETV_Net(tf.keras.Model):
     def build(self, ETE_ETV_layer = True, trainable_ETE_ETV = True, reg_lambdas = (0.0, 0.05), con_norm = 1., dropout_rate = 0.2):
         inputs = tf.keras.Input(shape=(n,n,1), batch_size = batch_size)
 
-        if ETE_ETV_layer:
+        if ETE_ETV_layer == 1:
             # ETE
             x = layers.ZeroPadding2D(padding=(n-1, n-1))(inputs)
             x = layers.Conv2D(1, (2*n-1,2*n-1), kernel_regularizer=regularizers.l1_l2(l1=reg_lambdas[0], l2=reg_lambdas[1]), trainable = trainable_ETE_ETV, kernel_constraint = constraints.max_norm(con_norm), kernel_initializer = kernel_init)(x)
@@ -81,6 +81,26 @@ class ETE_ETV_Net(tf.keras.Model):
             y = tf.reshape(y, (batch_size, n, 1, 1))
             
             combined = tf.concat([x, y], axis = 2)
+
+        # sequencial
+        elif ETE_ETV_layer == 2:
+            # ETE
+            x = layers.ZeroPadding2D(padding=(n-1, n-1))(inputs)
+            x = layers.Conv2D(1, (2*n-1,2*n-1), kernel_regularizer=regularizers.l1_l2(l1=reg_lambdas[0], l2=reg_lambdas[1]), trainable = trainable_ETE_ETV, kernel_constraint = constraints.max_norm(con_norm), kernel_initializer = kernel_init)(x)
+            x = tf.math.multiply(x, inputs)
+            
+            # ETV
+            y = layers.ZeroPadding2D(padding=(n-1, n-1))(x)
+            y = layers.Conv2D(1, (2*n-1,2*n-1), kernel_regularizer=regularizers.l1_l2(l1=reg_lambdas[0], l2=reg_lambdas[1]), trainable = trainable_ETE_ETV, kernel_constraint = constraints.max_norm(con_norm), kernel_initializer = kernel_init)(y)
+            y = tf.linalg.diag_part(y)
+            y = tf.reshape(y, (batch_size, n, 1, 1))
+
+        # 2 plain layers
+        elif ETE_ETV_layer == 3:
+            x = tf.keras.layers.Conv2D(n, (3,3))(inputs)
+            combined = tf.keras.layers.Conv2D(n, (3,3))(x)
+
+        # no initial convolution layers
         else: 
             combined = inputs
         
@@ -88,7 +108,7 @@ class ETE_ETV_Net(tf.keras.Model):
         
         z = tf.keras.layers.Dropout(dropout_rate)(z)
         
-        # Fully connected
+        # Dense part
         z = tf.keras.layers.Flatten()(z)
         z = tf.keras.layers.Dense(3*n, activation='relu')(z) # according to Melnikov 2020
         z = tf.keras.layers.Dense(10, activation='relu')(z) # according to Melnikov 2020
@@ -103,7 +123,6 @@ class ETE_ETV_Net(tf.keras.Model):
         return model
 
 
-
 test_size = 0.1
 val_test_size = 0.5
 dropout_rate = 0.2
@@ -112,13 +131,13 @@ y_upper = 10.0
 if input('reload corpus? y/n ') == 'y':
     N = int(input('N: '))
     n_max = int(input('n_max: '))
-    n = int(input('n (lower than n_max): '))
-    percentage = float(input('percentage: '))
+    n = int(input('n (lower or eq. to n_max): '))
+    percentage = float(input('percentage of q in corpus: '))
     gen_data(n_max = n_max, n = n, N = N, test_size = test_size, val_test_size = val_test_size, percentage = percentage)
     X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_data.npz')
-elif input('big run? y/n ') == 'y':
-    X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_dataN5000n25.npz')
-    N = 5000 # number of random generated graphs
+elif input('big run, N5000, n25, 50/50? y/n ') == 'y':
+    X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_dataN5000n_5050.npz')
+    N = 5000
     n = 25
 else:
     X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_data.npz')
@@ -126,23 +145,22 @@ else:
 
 
 if input('train? y/n ') =='y':
-    batch_size = int(input('batch size: '))# has to be a multiple of how many train and test samples
+    batch_size = int(input('batch size (has to be a multiple of how many train and test samples): '))
     verbose = True
     epochs = int(input('epochs: '))
     colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9)]
 
     '''
-    model_list = [(ETE_ETV_layer = True, trainable_ETE_ETV = False, reg_lambdas = (0.0, 0.00), con_norm = 1000000.),
-                    (ETE_ETV_layer = True, trainable_ETE_ETV = True, reg_lambdas = (0.0, 0.00), con_norm = 1000000.),
-                    (ETE_ETV_layer = True, trainable_ETE_ETV = True, reg_lambdas = (0.0, 0.05), con_norm = 1000000.),
-                    (ETE_ETV_layer = True, trainable_ETE_ETV = True, reg_lambdas = (0.0, 0.00), con_norm = 1.),
-                    (ETE_ETV_layer = False)]
+    Hyper parameters:
+    model_list = [(ETE_ETV_layer, trainable_ETE_ETV, reg_lambdas = (l1, l2), con_norm)]
+    1st: 0 no ete_etv_layer, 1 ete_etv_layer, 2 seq, 3 plain conv2d
+
     '''
-    model_list = [(True, True, (0.05, 0.00), 1000000.),
-                    (True, True, (0.15, 0.00), 1000000.),
-                    (True, True, (0.0, 0.45), 1000000.),
-                    (True, True, (0.15, 0.15), 100000.),
-                    (True, True, (0.45, 0.45), 100000.)]
+    model_list = [(0),
+                    (1, True, (0.15, 0.45), 1.),
+                    (2, True, (0.15, 0.45), 1.),
+                    (3, True),
+                    (False)]
 
     for i in range(len(model_list)):
         model4 = ETE_ETV_Net()
@@ -160,7 +178,7 @@ if input('train? y/n ') =='y':
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
-        plt.savefig('All4_3')
+        plt.savefig('All')
 
         plt.figure(i)
         plt.title(str(model_list[i]) + ' took time [min]: ' + str(vtime4/60))
