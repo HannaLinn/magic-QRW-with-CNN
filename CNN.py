@@ -48,8 +48,8 @@ def load_data(filename):
     y_val = file['arr_5']
     return X_train, y_train, X_test, y_test, X_val, y_val
 
-# n is a global! FIX This!
-def kernel_init(shape, dtype=None): 
+def kernel_init(shape, dtype=None):
+    n = shape[0]
     z = np.zeros((n-1, n-1))
     o = np.ones((n-1,1))
     detector1 = np.concatenate((z, o, z), axis = 1)
