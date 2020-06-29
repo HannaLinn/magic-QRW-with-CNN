@@ -66,7 +66,8 @@ class Corpus_n(object):
         '''
         
         if not percentage:
-            for i in range(N):
+            i = 0
+            while i < N:
                 top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
                 m = random.randint(n-1, top_edges) # number of edges
                 G = nx.gnm_random_graph(n, m)
@@ -79,30 +80,20 @@ class Corpus_n(object):
                 
                 gcat = GraphSimulation(G)
                 
-                self.corpus_list.append(gcat)
-                
-                if i % 10 == 0:
-                    print('Progress in categorisation of graphs: ', i/N, '\n')
+                if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
+                    self.corpus_list.append(gcat)
+                    
+                    if i % 10 == 0:
+                        print('Progress in categorisation of graphs: ', i/N, '\n')
+                else:
+                    print('any ties:', (gcat.label == np.array([0.0, 0.0])).all())
+                    i += 1
+                i += 1
 
         else:
-            for i in range(round(N/10)):
-                # Build the graphs
-                top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
-                m = random.randint(n-1, top_edges) # number of edges
-                G = nx.gnm_random_graph(n, m)
-                for ghost_node in range(n, self.n_max): # add the ghost nodes
-                    G.add_node(ghost_node)
-                    
-                # categorise
-                gcat = GraphSimulation(G)
-                if gcat.label[1] > 0:
-                    self.q_count += 1
-                
-                self.corpus_list.append(gcat)
-               
             save_list = []
+            save_list_q = []
             while len(self.corpus_list) < N:
-    
                 top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
                 m = random.randint(n-1, top_edges) # number of edges
                 G = nx.gnm_random_graph(n, m)
@@ -111,28 +102,37 @@ class Corpus_n(object):
                     
                 # categorise
                 gcat = GraphSimulation(G)
-                if self.q_count/N < percentage:
-                    if gcat.label[1] > 0:
-                        self.q_count += 1
-                        self.corpus_list.append(gcat)
-                    else:
-                        save_list.append(gcat)
+                
+                if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
+                    if gcat.label[1] > 0: # if quantum, gcat.label = [classical_advantage, quantum_advantage]
+                        if self.q_count/N < percentage:
+                            self.q_count += 1
+                            self.corpus_list.append(gcat)
+                        else:
+                            save_list_q.append(gcat)
+                            try:
+                                self.corpus_list.append(save_list.pop(0))
+                            except:
+                                pass
+                    else: # else classical
+                        if self.q_count/N < percentage:
+                            save_list.append(gcat)
+                            try:
+                                self.corpus_list.append(save_list_q.pop(0))
+                                self.q_count += 1
+                            except:
+                                pass
+                        else:
+                            self.corpus_list.append(gcat)
                 else:
-                    if gcat.label[1] > 0:
-                        self.q_count += 1
-                        self.corpus_list.append(gcat)
-                        try:
-                            self.corpus_list.append(save_list.pop(0))
-                        except:
-                            pass
-                    else:
-                        self.corpus_list.append(gcat)
+                    print('ties? ', (gcat.label == np.array([0.0, 0.0])).all())
                 
                 i = len(self.corpus_list)
                 if i % 10 == 0:
                     print('Progress in categorisation of graphs: ', i/N, '\n')
             
-            print('discarded in %: ', len(save_list)/N)
+            #print('discarded classical graphs in %: ', 100*len(save_list)/N)
+            #print('discarded quantum graphs in %: ', 100*len(save_list_q)/N)
                 
 
 class GraphSimulation(object):
@@ -146,6 +146,7 @@ class GraphSimulation(object):
             target : target vertex for the finish of the quantum walk (integer) default 1
             A : is a nxn numpy array of the adjecency matrix
             label : numpy array of [classical_advantage, quantum_advantage] as a float
+                    [0.0, 0.0] is a tie
             
     '''
     def __init__(self, G, step_size = 0.10, initial = 0, target = 1):
@@ -168,7 +169,15 @@ class GraphSimulation(object):
         self.pq = np.zeros((self.t_steps, 1)) # quantum probability at target after simulation
         self.QRW_simulation()
         
-        self.label = np.array([0, 1.0]) if self.pc_hitting_time > self.pq_hitting_time else np.array([1.0, 0])
+
+        if self.pc_hitting_time < self.pq_hitting_time:
+            self.label = np.array([1.0, 0.0]) # classical better
+        elif self.pc_hitting_time > self.pq_hitting_time:
+            self.label = np.array([0.0, 1.0]) # quantum better
+        elif self.pc_hitting_time >= self.max_time: #tie
+            self.label = np.array([0.0, 0.0])
+        else: #tie
+            self.label = np.array([0.0, 0.0])
         
         
     def QRW_simulation(self, gamma = 1):
@@ -216,9 +225,22 @@ class GraphSimulation(object):
             self.pc = np.append(self.pc, prob)
             t = round(t + self.step_size, 6)
         self.pc_hitting_time = t
-'''
-N = 10
+
+
+# check
+N = 500
 corpus = Corpus_n(n_max = 10, target = 1, initial = 0)
-corpus.generate_random_graphs(n=5, N = N, verbose = 1, percentage = 0.7)
-print(corpus.q_count/N)
-'''
+corpus.generate_random_graphs(n=15, N = N, verbose = 1, percentage = 0.5)
+print('q count: ', corpus.q_count/N)
+
+c = 0
+q = 0
+t = 0
+for l in corpus.corpus_list:
+    if l.label[0] == 1.0:
+        c += 1
+    elif l.label[1] == 1.0:
+        q += 1
+    else:
+        t += 1
+print('c, q, t: ', c, q, t)
