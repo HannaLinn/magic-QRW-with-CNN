@@ -85,12 +85,13 @@ class ETE_ETV_Net(tf.keras.Model):
 
     
     def build(self, n, batch_size, ETE_ETV_layer = True, trainable_ETE_ETV = True, reg_lambdas = (0.0, 0.05), con_norm = 1., dropout_rate = 0.2):
-        inputs = tf.keras.Input(shape=(n,n,1), batch_size = batch_size)
-
+        inputs = tf.keras.Input(shape=(n,n,1))
+        
+        # not seq.
         if ETE_ETV_layer == 1:
             # ETE
             # more than one time??
-            x = self.ETE(inputs, self.n, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
+            x = self.ETE(inputs, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
             
             # delete sym part
             x = tf.math.multiply(x, Filters.del_sym_part(shape=(n,n,1)))
@@ -98,20 +99,18 @@ class ETE_ETV_Net(tf.keras.Model):
             # one additional vanilla conv2d here?
 
             # ETV
-            y = self.ETV(inputs, self.n, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
+            y = self.ETV(inputs, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
             
-
             out = tf.concat([x, y], axis = 2)
 
         # sequencial
         elif ETE_ETV_layer == 2:
             # ETE
-            
-            x = self.ETE(inputs, self.n, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
+            x = self.ETE(inputs, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
             # more than one time?? 3 times in Mel cnn_arch line 116
             num_ETE = 3
             for i in range(num_ETE-1):
-                x = self.ETE(x, self.n, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
+                x = self.ETE(x, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
                 
             # delete sym part
             x = tf.math.multiply(x, Filters.del_sym_part(shape=(n,n,1)))
@@ -148,13 +147,14 @@ class ETE_ETV_Net(tf.keras.Model):
         
         model.summary()
         
-
-        #model.compile(optimizer='adam',
+        
+        #model.compile(optimizer='adam',s
         #              loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
         #              metrics=['accuracy'])
         sgd = keras.optimizers.SGD(lr=0.001, decay=0., momentum=0.9)
         model.compile(optimizer='sgd',
                       loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
                       metrics=['accuracy'])
+        #model.compile(optimizer='sgd', loss='mse', metrics=['accuracy'])
         
         return model

@@ -21,6 +21,8 @@ class GraphSimulation(object):
             target : target vertex for the finish of the quantum walk (integer) default 1
             A : is a nxn numpy array of the adjecency matrix
             label : numpy array of [classical_advantage, quantum_advantage] as a float
+                    [1.0, 0.0] is classical
+                    [0.0, 1.0] is quantum
                     [0.0, 0.0] is a tie
             
     '''
@@ -29,7 +31,8 @@ class GraphSimulation(object):
         self.A = nx.to_numpy_matrix(G)
         self.n = len(G)
         self.step_size = step_size
-        self.max_time = step_size * 1000 * self.n
+        #self.max_time = step_size * 1000 * self.n
+        self.max_time = 10000 * self.n
         self.initial = initial
         self.target = target
         self.pth = 1/np.log(self.n)
