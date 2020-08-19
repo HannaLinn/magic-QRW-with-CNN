@@ -59,14 +59,14 @@ class Corpus_n(object):
         
         for i in range(N):
             # draw from adjecency matrix because nx.draw_networkx() is weird
-            
-            G = self.corpus_list[i].G
-            color_map = self.gen_color_map(i)
-            
-            nx.draw_networkx(G, ax=ax[i], node_color=color_map, with_labels=True)
-            ax[i].set_axis_off()
-            
-        plt.savefig('colored_linear_graphs')
+            if (not self.corpus_list[i].label[0]):
+                G = self.corpus_list[i].G
+                color_map = self.gen_color_map(i)
+                
+                nx.draw_networkx(G, ax=ax[i], node_color=color_map, with_labels=True)
+                ax[i].set_axis_off()
+                
+            plt.savefig('colored_linear_graphs')
         plt.figure(N+2+self.n_max)
         
         plt.title('Classical and quantum random walk in random graphs with n=' + str(self.n_max))
@@ -114,11 +114,11 @@ class Corpus_n(object):
         plt.ylabel('Probability in target node')
         # quantum
         for i in range(N):
-            plt.plot(self.corpus_list[i].t, self.corpus_list[i].pq, '-', color = (i/N, 0.2, 0.2), label = str(i) + str(not self.corpus_list[i].label[0]) +' pq, quantum')
+            plt.plot(self.corpus_list[i].t, self.corpus_list[i].pq, '-', color = (i/N, 0.2, 0.2), label = str(i) + str(not self.corpus_list[i].label[0]) +' pq')
         
         # classical
         for i in range(N):
-            plt.plot(self.corpus_list[i].t, self.corpus_list[i].pc, '--', color = (i/N, 0.2, 0.2), label = str(i) + str(not self.corpus_list[i].label[1]) + ' pc, classical')
+            plt.plot(self.corpus_list[i].t, self.corpus_list[i].pc, '--', color = (i/N, 0.2, 0.2), label = str(i) + str(not self.corpus_list[i].label[1]) + ' pc')
         plt.plot(np.linspace(0,10,10), np.ones(10)*self.corpus_list[i].pth, '-', color = (0, 0, 0), label = 'pth')
         plt.legend()
         plt.savefig('probability_in_t_node' + str(self.n_max))

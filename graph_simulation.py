@@ -26,10 +26,13 @@ class GraphSimulation(object):
                     [0.0, 0.0] is a tie
             
     '''
-    def __init__(self, G, step_size = 0.10, initial = 0, target = 1):
-        self.G = G
-        self.A = nx.to_numpy_matrix(G)
-        self.n = len(G)
+    def __init__(self, A, step_size = 0.10, initial = 0, target = 1):
+        #self.G = G
+        #self.A = nx.to_numpy_matrix(G)
+        #self.n = len(G)
+        self.A = A
+        self.n = A.shape[0]
+
         self.step_size = step_size
         #self.max_time = step_size * 1000 * self.n
         self.max_time = 10000 * self.n
@@ -58,7 +61,7 @@ class GraphSimulation(object):
             self.label = np.array([0.0, 0.0])
 
         #print('self.pc_hitting_time, self.pq_hitting_time ', self.pc_hitting_time, ' ', self.pq_hitting_time)
-        
+        #print('self.pc[len(self.pc)-1], self.pq[len(self.pq)-1], self.pth ', self.pc[len(self.pc)-1], self.pq[len(self.pq)-1], self.pth)
         
     def QRW_simulation(self, gamma = 1):
         Aq = np.copy(self.A)
@@ -79,9 +82,9 @@ class GraphSimulation(object):
         found = False
         for i in range(self.t_steps):
             temp = result.states[i].full()
-            self.pq[i] = temp[self.n,self.n].real #pq = rho[n+1][n+1], [n,n] in zero indexing
-            if (self.pq[i] > self.pth) and not found:
-                self.pq_hitting_time = float(self.pq[i])
+            self.pq[i] = temp[self.n,self.n].real #pq = rho[n+1][n+1], [n,n] in zero indexing, this is the sink
+            if (self.pq[i] > self.pth) and (not found):
+                self.pq_hitting_time = round(i * self.step_size, 6)
                 found = True
                 
        
@@ -97,7 +100,7 @@ class GraphSimulation(object):
         
         t = self.step_size # don't need to calculate t = 0 as that is 0.0
         prob = 0
-        while prob < self.pth and t < self.max_time:
+        while (prob < self.pth) and (t < self.max_time):
             temp1 = np.exp(-t)
             temp2 = expm(T*t)
             f = np.dot(temp2, p0)*temp1 #eq (3) Melnikov 1
@@ -105,3 +108,4 @@ class GraphSimulation(object):
             self.pc = np.append(self.pc, prob)
             t = round(t + self.step_size, 6)
         self.pc_hitting_time = t
+        
