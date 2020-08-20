@@ -28,18 +28,19 @@ class Corpus_n(object):
         self.target = target
         self.q_count = 0
     
-    def gen_color_map(self, i):
+    def gen_color_map(self, label, G):
+        # G is a networkx object
         color_map = []
-        if self.corpus_list[i].label[1] == 1.0: # quantum
-            for node in self.corpus_list[i].G:
+        if label[1] == 1.0: # quantum
+            for node in G:
                 if node == self.initial:
                     color_map.append('yellow')
                 elif node == self.target:
                     color_map.append('red')
                 else:
                     color_map.append('magenta')
-        elif self.corpus_list[i].label[0] == 1.0: # classical
-            for node in self.corpus_list[i].G:
+        elif label[0] == 1.0: # classical
+            for node in G:
                 if node == self.initial:
                     color_map.append('yellow')
                 elif node == self.target:
@@ -48,9 +49,16 @@ class Corpus_n(object):
                     color_map.append('grey')
         return color_map
         
+    def networkx_G_from_A(A):
+        rows, cols = np.where(A == 1)
+        edges = zip(rows.tolist(), cols.tolist())
+        G = nx.Graph()
+        G.add_edges_from(edges)
+        return G
+
     def plot_random_graph_corpus(self):
         '''
-        Will only work for random graphs and not work with ghost nodes.
+        Will only work for random graphs.
         '''
         N = len(self.corpus_list)
         fig, axes = plt.subplots(nrows=1, ncols=N)
@@ -58,13 +66,10 @@ class Corpus_n(object):
         plt.title('magenta = quantum, grey = classical, initial = yellow, target = red')
         
         for i in range(N):
-            # draw from adjecency matrix because nx.draw_networkx() is weird
-            if (not self.corpus_list[i].label[0]):
-                G = self.corpus_list[i].G
-                color_map = self.gen_color_map(i)
-                
-                nx.draw_networkx(G, ax=ax[i], node_color=color_map, with_labels=True)
-                ax[i].set_axis_off()
+            G = Corpus_n.networkx_G_from_A(self.corpus_list[i].A)
+            color_map = self.gen_color_map(self.corpus_list[i].label, G)
+            nx.draw_networkx(G, ax=ax[i], node_color=color_map, with_labels=True)
+            ax[i].set_axis_off()
                 
             plt.savefig('colored_linear_graphs')
         plt.figure(N+2+self.n_max)
@@ -85,6 +90,7 @@ class Corpus_n(object):
     
     def plot_linear_graph_corpus(self):
         '''
+        Does not work properly, I gave up.
         Will only work for linear graphs and not work with ghost nodes.
         '''
         N = len(self.corpus_list)
@@ -97,11 +103,12 @@ class Corpus_n(object):
             gr = nx.Graph()
             for e in range(self.n_max-1):
                 gr.add_edge(e, e+1)
+
             labels = {}
-            G = self.corpus_list[i].G
-            for e in range(self.n_max):
-                labels[e] = str(list(G)[e])
-            color_map = self.gen_color_map(i)
+
+            for node in range(self.n_max):
+                labels[node] = str(self.corpus_list[i].node_list[node])
+            color_map = self.gen_color_map(self.corpus_list[i].label, self.corpus_list[i].node_list)
             
             nx.draw_networkx(gr, ax=ax[i], node_color=color_map, labels=labels)
             ax[i].set_axis_off()
@@ -124,32 +131,46 @@ class Corpus_n(object):
         plt.savefig('probability_in_t_node' + str(self.n_max))
 
     def random_graph(self, n):
+        '''
+        Returns [adjecency matrix in the form of a numpy array, nodes in a list]
+        '''
         top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
         m = random.randint(n-1, top_edges) # number of edges
         G = nx.gnm_random_graph(n, m)
-        return G
+        A = nx.to_numpy_matrix(G)
+        return [A, G.nodes()]
 
     def linear_graph(self, n, all_graphs = False):
+        '''
+        Returns either a list of all possible graphs or one random.
+        Each element in the list has [adjecency matrix in the form of a numpy array, nodes in a list]
+        '''
         graph_list = self.gen_linear_graph_lists(n)
         return_list = []
         if not all_graphs:
             graph_list = [random.choice(graph_list)]
         for g in graph_list:
-            G = nx.Graph()
-            G.add_nodes_from(g)
+            A = np.zeros((n,n))
             for i in range(n-1):
-                G.add_edge(i, i+1)
-            return_list.append(G)
+                A[g[i], g[i+1]] = 1
+                A[g[i+1], g[i]] = 1
+            return_list.append([A, g])
         r = return_list if all_graphs else return_list[0]
         return r
 
     def cyclic_graph(self, n, all_graphs = False):
+        '''
+        Returns either a list of all possible graphs or one random.
+        Each element in the list has [adjecency matrix in the form of a numpy array, nodes in a list]
+        '''
         r = self.linear_graph(n, all_graphs = all_graphs)
         if all_graphs:
-            for G in r:
-                G.add_edge(0, n-1) # make ring
+            for A in r:
+                A[0][g[0], g[n-1]] = 1
+                A[0][g[n-1], g[0]] = 1
         else:
-            r.add_edge(0, n-1)
+            r[0][g[0], g[n-1]] = 1
+            r[0][g[n-1], g[0]] = 1
         return r
 
     def gen_linear_graph_lists(self, n):
@@ -198,108 +219,112 @@ class Corpus_n(object):
         '''
         
         if all_graphs:
+            random = False
             if linear:
                 graph_list = self.linear_graph(n, all_graphs)
             elif cyclic:
                 graph_list = self.cyclic_graph(n, all_graphs)
-            for g in graph_list:
-                self.corpus_list.append(GraphSimulation(g))
+            for graph in graph_list:
+                self.corpus_list.append(GraphSimulation(graph, initial = self.initial, target = self.target))
             for l in self.corpus_list:
                 if l.label[1] == 1.0:
                 	self.q_count += 1
 
         else:
-	        
-	        if not percentage:
-	            i = 0
-	            while i < N:
-	                if random:
-	                    G = self.random_graph(n)
-	                if linear:
-	                    G = self.linear_graph(n)
-	                if cyclic:
-	                    G = self.cyclic_graph(n)
-	                
-	                for ghost_node in range(n, self.n_max): # add the ghost nodes, not connected
-	                    G.add_node(ghost_node)
-	                    
-	                if verbose:
-	                    plt.figure(i)
-	                    nx.draw_networkx(G, with_labels=True)
-	                
-	                gcat = GraphSimulation(G)
-	                
-	                
-	                if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
-	                    self.corpus_list.append(gcat)
-	                    
-	                    if i % 10 == 0:
-	                        print('Progress in categorisation of graphs: ', i/N, '\n')
-	                else:
-	                    print('any ties:', (gcat.label == np.array([0.0, 0.0])).all())
-	                    i += 1
-	                i += 1
+            linear = False
+            cyclic = False
+            if not percentage:
+                i = 0
+                while i < N:
+                    if random:
+                        graph = self.random_graph(n)
+                    if linear:
+                        graph = self.linear_graph(n)
+                    if cyclic:
+                        graph = self.cyclic_graph(n)
+                    
+                    # adding ghost nodes not connected
+                    for ghost_node in range(self.n_max - n):
+                        A = np.c_[A, np.zeros((n+ghost_node, 1))]
+                        A = np.r_[A, np.zeros((1, n+ghost_node+1))]
+                    
+                    gcat = GraphSimulation(graph, initial = self.initial, target = self.target)
+                    
+                    
+                    if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
+                        self.corpus_list.append(gcat)
+                        
+                        if i % 10 == 0:
+                            print('Progress in categorisation of graphs: ', i/N, '\n')
+                    else:
+                        print('any ties:', (gcat.label == np.array([0.0, 0.0])).all())
+                        i += 1
+                    i += 1
 
-	        else:
-	            save_list = []
-	            save_list_q = []
-	            while len(self.corpus_list) < N:
-	                if random:
-	                    G = self.random_graph(n)
-	                if linear:
-	                    G = self.linear_graph(n, all_graphs)
-	                if cyclic:
-	                    G = self.cyclic_graph(n)
-	                
-	                for ghost_node in range(n, self.n_max): # add the ghost nodes, not connected
-	                    G.add_node(ghost_node)
-	                
-	                # categorise
-	                gcat = GraphSimulation(G)
-	                
-	                if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
-	                    if gcat.label[1] > 0: # if quantum, gcat.label = [classical_advantage, quantum_advantage]
-	                        if self.q_count/N < percentage:
-	                            self.q_count += 1
-	                            self.corpus_list.append(gcat)
-	                        else:
-	                            save_list_q.append(gcat)
-	                            try:
-	                                self.corpus_list.append(save_list.pop(0))
-	                            except:
-	                                pass
-	                    else: # else classical
-	                        if self.q_count/N < percentage:
-	                            save_list.append(gcat)
-	                            try:
-	                                self.corpus_list.append(save_list_q.pop(0))
-	                                self.q_count += 1
-	                            except:
-	                                pass
-	                        else:
-	                            self.corpus_list.append(gcat)
-	                else:
-	                    print('ties? ', (gcat.label == np.array([0.0, 0.0])).all())
-	                
-	                i = len(self.corpus_list)
-	                if i % 10 == 0:
-	                    print('Progress in categorisation of graphs: ', i/N, '\n')
-	            
-	            print('discarded classical graphs in %: ', 100*len(save_list)/N)
-	            print('discarded quantum graphs in %: ', 100*len(save_list_q)/N)
-	    
+            else:
+                save_list = []
+                save_list_q = []
+                while len(self.corpus_list) < N:
+                    if random:
+                        graph = self.random_graph(n)
+                    if linear:
+                        graph = self.linear_graph(n)
+                    if cyclic:
+                        graph = self.cyclic_graph(n)
+                    
+                    # adding ghost nodes not connected
+                    for ghost_node in range(self.n_max - n):
+                        A = np.c_[A, np.zeros((n+ghost_node, 1))]
+                        A = np.r_[A, np.zeros((1, n+ghost_node+1))]
+                    
+                    # categorise
+                    gcat = GraphSimulation(graph, initial = self.initial, target = self.target)
+                    
+                    if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
+                        if gcat.label[1] > 0: # if quantum, gcat.label = [classical_advantage, quantum_advantage]
+                            if self.q_count/N < percentage:
+                                self.q_count += 1
+                                self.corpus_list.append(gcat)
+                            else:
+                                save_list_q.append(gcat)
+                                try:
+                                    self.corpus_list.append(save_list.pop(0))
+                                except:
+                                    pass
+                        else: # else classical
+                            if self.q_count/N < percentage:
+                                save_list.append(gcat)
+                                try:
+                                    self.corpus_list.append(save_list_q.pop(0))
+                                    self.q_count += 1
+                                except:
+                                    pass
+                            else:
+                                self.corpus_list.append(gcat)
+                    else:
+                        print('ties? ', (gcat.label == np.array([0.0, 0.0])).all())
+                    
+                    i = len(self.corpus_list)
+                    if i % 10 == 0:
+                        print('Progress in categorisation of graphs: ', i/N, '\n')
+                
+                print('discarded classical graphs in %: ', 100*len(save_list)/N)
+                print('discarded quantum graphs in %: ', 100*len(save_list_q)/N)
+        
 '''
 # check
-N = 5
+N = 20
 ntest = 4
 corpus = Corpus_n(n_max = ntest, target = 1, initial = 0)
-corpus.generate_graphs(n=ntest, N = N, cyclic = False, all_graphs = False)
+corpus.generate_graphs(n=ntest, N = N, linear = True, all_graphs = True)
 print('q count: ', corpus.q_count/N)
 
 c = 0
 q = 0
 t = 0
 for l in corpus.corpus_list:
+    print(l.A)
+    print()
     if l.label[0] == 1.0:
         c += 1
     elif l.label[1] == 1.0:
@@ -307,7 +332,7 @@ for l in corpus.corpus_list:
     else:
         t += 1
 print('c, q, t: ', c, q, t)
-corpus.plot_random_graph_corpus()
+corpus.plot_linear_graph_corpus()
 
 plt.show()
 '''

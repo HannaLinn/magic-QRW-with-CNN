@@ -8,7 +8,6 @@ Created on Wed Aug 12 17:58:59 2020
 import numpy as np
 import qutip as qt
 from scipy.linalg import expm
-import networkx as nx
 
 class GraphSimulation(object):
     '''    
@@ -16,7 +15,6 @@ class GraphSimulation(object):
     Init will run simulations and categorise the graph.
     
     Args:
-            G = graph : networkx object
             initial : initial vertex for the start of random walk (integer) default 0
             target : target vertex for the finish of the quantum walk (integer) default 1
             A : is a nxn numpy array of the adjecency matrix
@@ -26,12 +24,10 @@ class GraphSimulation(object):
                     [0.0, 0.0] is a tie
             
     '''
-    def __init__(self, A, step_size = 0.10, initial = 0, target = 1):
-        #self.G = G
-        #self.A = nx.to_numpy_matrix(G)
-        #self.n = len(G)
-        self.A = A
-        self.n = A.shape[0]
+    def __init__(self, graph, step_size = 0.10, initial = 0, target = 1):
+        self.A = graph[0]
+        self.n = self.A.shape[0]
+        self.node_list = graph[1]
 
         self.step_size = step_size
         #self.max_time = step_size * 1000 * self.n
@@ -62,7 +58,7 @@ class GraphSimulation(object):
 
         #print('self.pc_hitting_time, self.pq_hitting_time ', self.pc_hitting_time, ' ', self.pq_hitting_time)
         #print('self.pc[len(self.pc)-1], self.pq[len(self.pq)-1], self.pth ', self.pc[len(self.pc)-1], self.pq[len(self.pq)-1], self.pth)
-        
+    
     def QRW_simulation(self, gamma = 1):
         Aq = np.copy(self.A)
         Aq = np.concatenate((Aq, np.zeros((self.n,1))), axis = 1)
