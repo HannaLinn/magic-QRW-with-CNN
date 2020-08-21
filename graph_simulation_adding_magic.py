@@ -166,25 +166,36 @@ class GraphSimulation(object):
 
         # set up the figure, the axis, and the plot element we want to animate
         fig = plt.figure()
-        ax = plt.axes(xlim=(0, self.n-1), ylim=(0, 1.5))
+        ax = plt.axes(xlim=(0, self.n-1), ylim=(-0.1, 1.0))
         pcline, = ax.plot([], [], lw=2, label= 'quantum')
         pqline, = ax.plot([], [], lw=2, label = 'classical')
+        target, = ax.plot([], [], mew=7, label = 'target', c = 'r', marker = 'o')
+        initial, = ax.plot([], [], mew=7, label = 'initial', c = 'y', marker = 'v')
         ax.set_xlabel('nodes')
         ax.set_ylabel('probability')
         plt.title(str(self.node_list))
+        plt.legend()
 
                                                                                                                         
         # initialization function: plot the background of each frame
         def init():
             pcline.set_data([], [])
             pqline.set_data([], [])
-            return pcline, pqline,
+            target.set_data([], [])
+            initial.set_data([], [])
+            return pcline, pqline, target, initial
 
         # animation function called sequentially
         def animate(t):
-            pcline.set_data(np.arange(0, self.n), self.pc[t,:])
-            pqline.set_data(np.arange(0, self.n), self.pq[t,:])
-            return pcline, pqline,
+            pc_anim = self.pc[t,:][np.array(self.node_list)]
+            pq_anim = self.pq[t,:][np.array(self.node_list)]
+            pcline.set_data(np.arange(0, self.n), pc_anim)
+            pqline.set_data(np.arange(0, self.n), pq_anim)
+
+            target.set_data(np.where(np.array(self.node_list) == self.target), 0)
+            initial.set_data(np.where(np.array(self.node_list) == self.initial), 0)
+
+            return pcline, pqline, target, initial,
 
 
         # call the animator.  blit=True means only re-draw the parts that have changed.
@@ -208,14 +219,14 @@ g = [2, 0, 1]
 graph = [A, g]
 '''
 
-graph = [np.array([[0., 0., 1., 1., 0., 0.],
+graph2 = [np.array([[0., 0., 1., 1., 0., 0.],
        [0., 0., 0., 0., 1., 1.],
        [1., 0., 0., 0., 0., 0.],
        [1., 0., 0., 0., 1., 0.],
        [0., 1., 0., 1., 0., 0.],
        [0., 1., 0., 0., 0., 0.]]), [2, 0, 3, 4, 1, 5]]
 
-graph = [np.array([[0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0.,
+graph1 = [np.array([[0., 0., 0., 0., 0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
        [0., 0., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
         0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
