@@ -13,9 +13,9 @@ from corpus_generator import *
 from QRWCNN_arch import *
 
 
-def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, percentage = False, random = True, line = False, cyclic = False, all_graphs = False):
+def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, percentage = False, random = True, linear = False, cyclic = False, all_graphs = False):
     corpus = Corpus_n(n_max = n_max, target = 1, initial = 0)
-    corpus.generate_graphs(n = n, N = N, percentage = percentage, random = random, line = line, cyclic = cyclic, all_graphs = all_graphs)
+    corpus.generate_graphs(n = n, N = N, percentage = percentage, random = random, linear = linear, cyclic = cyclic, all_graphs = all_graphs)
     print('-'*10 + ' Corpus done! ' + '-'*10)
     
     N = len(corpus.corpus_list)
@@ -53,7 +53,7 @@ def get_data():
         
         print('\nValidation data: independent data on which to evaluate after training.')
         val_test_size = float(input('validation size, split from test data, if not used set to 0.0 (for ex 0.1): '))
-        s = input('random, line or cyclic? r/l/c ')
+        s = input('random, linear or cyclic? r/l/c ')
         if s == 'r':
             N = int(input('N: '))
             n_max = int(input('n_max: '))
@@ -69,7 +69,7 @@ def get_data():
                 percentage = float(input('percentage of q in corpus: '))
             n_max = int(input('n_max: '))
             n = int(input('n (lower or eq. to n_max): '))
-            gen_data(n_max = n_max, n = n, N = N, test_size = test_size, val_test_size = val_test_size, percentage = percentage, random = False, line = True, all_graphs = all_graphs)
+            gen_data(n_max = n_max, n = n, N = N, test_size = test_size, val_test_size = val_test_size, percentage = percentage, random = False, linear = True, all_graphs = all_graphs)
         elif s == 'c':
             all_graphs = int(input('all possible graphs? 1/0 '))
 
@@ -79,6 +79,8 @@ def get_data():
             n_max = int(input('n_max: '))
             n = int(input('n (lower or eq. to n_max): '))
             gen_data(n_max = n_max, n = n, N = N, test_size = test_size, val_test_size = val_test_size, percentage = percentage, random = False, cyclic = True, all_graphs = all_graphs)
+        else:
+            raise NameError('Type not correctly given, try again.')
         X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_data.npz')
     elif input('big run, random, N5000, n25, 50/50? y/n ') == 'y':
         val_test_size = 0.0
@@ -113,10 +115,8 @@ X_train, y_train, X_test, y_test, X_val, y_val = get_data()
 
 
 if input('train? y/n ') =='y':
-    dropout_rate = 0.2
     y_upper = 1.0
     batch_size = int(input('batch size (has to be a multiple of how many train and test samples), ex 3: '))
-    verbose = True
     epochs = int(input('epochs: '))
     colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9)]
     
@@ -124,7 +124,7 @@ if input('train? y/n ') =='y':
     n = X_train.shape[1]
     '''
     Hyper parameters:
-    model_list = [(ETE_ETV_layer, trainable_ETE_ETV, reg_lambdas = (l1, l2), con_norm)]
+    model_list = [(ETE_ETV_layer, trainable_ETE_ETV, reg_lambdas = (l1, l2), con_norm, dropout_rate)]
     1st: 0 no ete_etv_layer, 1 ete_etv_layer, 2 seq, 3 plain conv2d
 
     
@@ -134,9 +134,9 @@ if input('train? y/n ') =='y':
                     (3, True),
                     (False)]
     '''
-    model_list = [(2, True, (0.15, 0.45), 1.),
-                (3, True),
-                (False)]
+    model_list = [(2, False, (0.15, 0.45), 1., 0.2),
+                (2, True (0.15, 0.45), 1., 0.4),
+                (2, True (0.45, 0.45), 1., 0.4)]
 
     for i in range(1):
         model4 = ETE_ETV_Net(n)
@@ -149,8 +149,8 @@ if input('train? y/n ') =='y':
         plt.figure(10)
         plt.title('All')
         plt.ylim(0.0, y_upper)
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = colors[i], label = 'val loss for ' + str(n) + ' nodes')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = colors[i], label = 'val accuracy for ' + str(n) + ' nodes')
+        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = colors[i], label = 'test loss for ' + str(n) + ' nodes')
+        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = colors[i], label = 'test accuracy for ' + str(n) + ' nodes')
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
@@ -159,9 +159,9 @@ if input('train? y/n ') =='y':
         plt.figure(i)
         plt.title(str(model_list[i]) + ' took time [min]: ' + str(vtime4/60))
         plt.ylim(0.0, y_upper)
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = colors[i], label = 'val loss')
+        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss')
         plt.plot(np.linspace(0.0, epochs, epochs), history4.history['loss'],':', color = colors[i], label = 'loss')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = colors[i], label = 'val accuracy')
+        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = tuple(t-0.3 for t in colors[n_iter-n_min_loop]), label = 'test accuracy')
         plt.plot(np.linspace(0.0, epochs, epochs), history4.history['accuracy'],'-.', color = colors[i], label = 'accuracy')
         plt.xlabel('epochs')
         plt.ylabel('learning performance')

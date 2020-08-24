@@ -231,8 +231,6 @@ class Corpus_n(object):
                 	self.q_count += 1
 
         else:
-            linear = False
-            cyclic = False
             if not percentage:
                 i = 0
                 while i < N:
@@ -310,20 +308,23 @@ class Corpus_n(object):
                 
                 print('discarded classical graphs in %: ', 100*len(save_list)/N)
                 print('discarded quantum graphs in %: ', 100*len(save_list_q)/N)
+
+            print(graph)
         
 '''
 # check
-N = 20
-ntest = 4
+import sys
+np.set_printoptions(threshold=sys.maxsize)
+N = 1
+ntest = 50
 corpus = Corpus_n(n_max = ntest, target = 1, initial = 0)
-corpus.generate_graphs(n=ntest, N = N, linear = True, all_graphs = True)
+corpus.generate_graphs(n=ntest, N = N, linear = True, all_graphs = False)
 print('q count: ', corpus.q_count/N)
 
 c = 0
 q = 0
 t = 0
 for l in corpus.corpus_list:
-    print(l.A)
     print()
     if l.label[0] == 1.0:
         c += 1
@@ -332,7 +333,6 @@ for l in corpus.corpus_list:
     else:
         t += 1
 print('c, q, t: ', c, q, t)
-corpus.plot_linear_graph_corpus()
 
 plt.show()
 '''
