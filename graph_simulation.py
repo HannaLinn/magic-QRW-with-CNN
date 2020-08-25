@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 
-class GraphSimulation(object):
+class GraphSimulation():
     '''    
     Contains methods for simulating the quantum random walk and for classical random walk.
     Init will run simulations and categorise the graph.
@@ -39,102 +39,31 @@ class GraphSimulation(object):
         self.target = target
         self.pth = 1/np.log(self.n)
         
-        self.CRW_simulation() # run until finished or max_time
+        self.pc_hitting_time, self.pc = self.CRW_simulation() # run until finished or max_time
         
-        self.QRW_simulation()
+        self.pq_hitting_time, self.pq = self.QRW_simulation(ancilla = False) # vanilla
+        self.pq_pos_hitting_time, self.pq_pos = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'positive')
+        self.pq_neg_hitting_time, self.pq_neg = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'negative')
+        self.pq_T_hitting_time, self.pq_T = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'T')
+        self.pq_H_hitting_time, self.pq_H = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'H')
 
-        # make its own function
-        if self.pc_hitting_time < self.pq_hitting_time:
-            self.label = np.array([1.0, 0.0]) # classical better
-        elif self.pc_hitting_time > self.pq_hitting_time:
-            self.label = np.array([0.0, 1.0]) # quantum better
-        elif self.pc_hitting_time >= self.max_time: #tie
-            self.label = np.array([0.0, 0.0])
-        else: #tie
-            self.label = np.array([0.0, 0.0])
+        self.colors = ['grey', 'magenta', 'cyan', 'yellow', 'red', 'blue']
+        self.names = ['c', 'q', 'pos', 'neg', 'T', 'H']
 
-        
+        self.hitting_time_all = np.array([self.pc_hitting_time, self.pq_hitting_time, self.pq_pos_hitting_time, self.pq_neg_hitting_time, self.pq_T_hitting_time, self.pq_H_hitting_time])
+        self.p_all = [self.pc, self.pq, self.pq_pos, self.pq_neg, self.pq_T, self.pq_H]
+        self.set_label()
 
-        #print('self.pc_hitting_time, self.pq_hitting_time ', self.pc_hitting_time, ' ', self.pq_hitting_time)
-        #print('self.pc[len(self.pc)-1], self.pq[len(self.pq)-1], self.pth ', self.pc[len(self.pc)-1], self.pq[len(self.pq)-1], self.pth)
+    def set_label(self):
+        temp = np.zeros(len(self.hitting_time_all), dtype=float)
+        temp[np.argmin(self.hitting_time_all)] = 1.0
+        self.label = temp
+
     
-    def QRW_simulation(self, gamma = 1, ancilla = False, connection = 'bidirected', split = False, superposition = 'positive'):
-        '''
-        Args:
-                connection : 'ghost' (not connected ancillary node, only with split), or
-                             'bidirected' (connected undirected ancillary node).
-                split : True or False (the ancillary node is connected to the initial nodes neighbours).
-                superposition :
-                              'positive' (np.sqrt(1/2) * (qt.basis(nq, self.initial) + qt.basis(nq, self.nq-1)))
-                              'negative' (np.sqrt(1/2) * (qt.basis(nq, self.initial) - qt.basis(nq, self.nq-1)))
-                              'T' (where T_state = np.cos(beta) * qt.basis(nq, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq, nq-1), beta = 0.5 * np.arccos(1/np.sqrt(3))), or
-                              'H' (where H_state = np.cos(np.pi/8) * qt.basis(nq, self.initial) + np.sin(np.pi/8) * qt.basis(nq, nq-1)).
-        '''
-        self.pq_hitting_time = self.step_size * 1000 * self.n
-        self.t_steps = int(np.ceil(self.pc_hitting_time / self.step_size))
-        self.t = np.linspace(0.0, self.pc_hitting_time, self.t_steps)
-        self.pq = np.zeros((self.t_steps, self.n+1)) # quantum probability, dim=(time, node+1), +1 for sink
-        Aq = np.copy(self.A)
-        Aq = np.concatenate((Aq, np.zeros((self.n, 1))), axis = 1)
-        Aq = np.concatenate((Aq, np.zeros((1, self.n+1))), axis = 0)
-        nq_dim = self.n + 1 # dimension of Fock space
-        self.sink = self.n # index of the sink with 0 indexing
-
-        if ancilla:
-
-            Aq = np.concatenate((Aq, np.zeros((self.n+1,1))), axis = 1) # ancilla node
-            Aq = np.concatenate((Aq, np.zeros((1, self.n+2))), axis = 0) # ancilla node
-            nq_dim = self.n + 2 # size of Fock space
-            if connection == 'bidirected':
-                Aq[0, nq-1] = 1
-                Aq[nq-1, 0] = 1
-
-            if split:
-                for row in range(self.n-1):
-                    if self.A[row, self.initial]:
-                        Aq[nq-1, row] = 1
-                        Aq[row, nq-1] = 1
-            else:
-                pass
-
-            if superposition == 'positive':
-                rho0 = np.sqrt(1/2) * (qt.basis(nq, self.initial) + qt.basis(nq, self.nq-1))
-            elif superposition == 'negative':
-                rho0 = np.sqrt(1/2) * (qt.basis(nq, self.initial) - qt.basis(nq, self.nq-1))
-            elif superposition == 'T':
-                beta = 0.5 * np.arccos(1/np.sqrt(3))
-                rho0 = np.cos(beta) * qt.basis(nq, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq, nq-1) # last node is the ancilla node
-            elif superposition == 'H':
-                rho0 = np.cos(np.pi/8) * qt.basis(nq, self.initial) + np.sin(np.pi/8) * qt.basis(nq, nq-1)
-            else:
-                raise NameError('Name the type of magic state: T or H.')
-            rho0 = rho0 * rho0.dag()
-
-        # CTQW dynamics is simulated by solving the GKSL eq, with Hamiltonian H = h_bar*A^q, h_bar=1
-        H = qt.Qobj(Aq)
-        psi0 = qt.basis(nq_dim, self.initial)
-        rho0 = psi0 * psi0.dag() # init cond rho0 = |1><1|, but with zero indexing
-        L = qt.basis(nq_dim, self.sink) * qt.basis(nq_dim, self.target).dag() # L = |n+1><t|, but with zero indexing
-        #shanawas version
-        #a = qt.destroy(N)
-        #L = a.dag()
-        c_op = np.sqrt(gamma) * L # collapse op C = sqrt(gamma)*L
-        options = qt.Options(nsteps=1500, store_states=True, atol=1e-12, rtol=1e-12)
-        result = qt.mesolve(H, rho0, self.t, c_op, options = options) # solves the master eq
-        
-        found = False
-        for t in range(self.t_steps):
-            self.pq[t, :] = result.states[t].full().diagonal().real # diagonal is the probability, don't want sink in pq
-            prob = result.states[t].full().diagonal()[self.sink].real
-            if (prob > self.pth) and (not found):
-                self.pq_hitting_time = round(t * self.step_size, 6)
-                found = True
-                
-       
     def CRW_simulation(self):
-        self.pc_hitting_time = 0
-        self.pc = np.zeros((1, self.n)) # classical probability, dim=(time, node)
-        self.pc[0, self.initial] = 1
+        pc_hitting_time = 0
+        pc = np.zeros((1, self.n)) # classical probability, dim=(time, node)
+        pc[0, self.initial] = 1
         Ac = np.copy(self.A)
         Ac[:, self.target] = 0
         Ac[self.target, self.target] = 1
@@ -150,20 +79,102 @@ class GraphSimulation(object):
             temp1 = np.exp(-t)
             temp2 = expm(T*t)
             temp3 = np.dot(temp2, p0)*temp1 #eq (3) Melnikov 1
-            self.pc = np.append(self.pc, np.reshape(temp3, (1, self.n)), axis = 0)
+            pc = np.append(pc, np.reshape(temp3, (1, self.n)), axis = 0)
             prob = temp3[self.target]
             t = round(t + self.step_size, 6)
-        self.pc_hitting_time = t
+        pc_hitting_time = t
+        self.t_steps = int(np.ceil(pc_hitting_time / self.step_size))
+        self.t = np.linspace(0.0, pc_hitting_time, self.t_steps)
+        return pc_hitting_time, pc
 
-    def plot(self, prob_list = []):
-        plt.plot(self.t, self.pq[:, self.target], '-', label = ' pq, quantum', c = 'm')
-        plt.plot(self.t, self.pc[:, self.target], '--', label = ' pc, classical', c = 'grey')
-        plt.plot(self.t, self.pq_ancilla[:, self.target], '-.', label = ' pq, quantum ancilla', c = 'cyan')
-        plt.title('Probability in the target node')
+
+    def QRW_simulation(self, gamma = 1, ancilla = False, connection = 'bidirected', split = False, superposition = 'positive', verbose = False):
+        '''
+        Args:
+                connection : 'ghost' (not connected ancillary node, only with split), or
+                             'bidirected' (connected undirected ancillary node).
+                split : True or False (the ancillary node is connected to the initial nodes neighbours).
+                superposition :
+                              'positive' (np.sqrt(1/2) * (qt.basis(nq, self.initial) + qt.basis(nq, self.nq-1)))
+                              'negative' (np.sqrt(1/2) * (qt.basis(nq, self.initial) - qt.basis(nq, self.nq-1)))
+                              'T' (where T_state = np.cos(beta) * qt.basis(nq, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq, nq-1), beta = 0.5 * np.arccos(1/np.sqrt(3))), or
+                              'H' (where H_state = np.cos(np.pi/8) * qt.basis(nq, self.initial) + np.sin(np.pi/8) * qt.basis(nq, nq-1)).
+        '''
+        pq_hitting_time = self.step_size * 1000 * self.n
+        pq = np.zeros((self.t_steps, self.n+1)) # quantum probability, dim=(time, node+1), +1 for sink
+        Aq = np.copy(self.A)
+        Aq = np.concatenate((Aq, np.zeros((self.n, 1))), axis = 1) # adding sink
+        Aq = np.concatenate((Aq, np.zeros((1, self.n+1))), axis = 0) # adding sink
+        nq_dim = self.n + 1 # dimension of Fock space
+        self.sink = self.n # index of the sink with 0 indexing
+
+        if ancilla:
+
+            Aq = np.concatenate((Aq, np.zeros((self.n+1,1))), axis = 1) # ancilla node
+            Aq = np.concatenate((Aq, np.zeros((1, self.n+2))), axis = 0) # ancilla node
+            nq_dim = self.n + 2 # size of Fock space
+            self.extra = self.n + 1
+            if connection == 'bidirected':
+                Aq[0, self.extra] = 1
+                Aq[self.extra, 0] = 1
+
+            if split:
+                for row in range(self.n-1):
+                    if self.A[row, self.initial]:
+                        Aq[self.extra, row] = 1
+                        Aq[row, self.extra] = 1
+            else:
+                pass
+
+            if superposition == 'positive':
+                rho0 = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
+            elif superposition == 'negative':
+                rho0 = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
+            elif superposition == 'T':
+                beta = 0.5 * np.arccos(1/np.sqrt(3))
+                rho0 = np.cos(beta) * qt.basis(nq_dim, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq_dim, self.extra)
+            elif superposition == 'H':
+                rho0 = np.cos(np.pi/8) * qt.basis(nq_dim, self.initial) + np.sin(np.pi/8) * qt.basis(nq_dim, self.extra)
+            else:
+                raise NameError('Name the type of magic state: T or H.')
+            rho0 = rho0 * rho0.dag()
+
+            if verbose:
+                print('Aq: ', Aq)
+                qt.hinton(rho0)
+                plt.title('$\rho_0$')
+                plt.show()
+
+        # CTQW dynamics is simulated by solving the GKSL eq, with Hamiltonian H = h_bar*A^q, h_bar=1
+        H = qt.Qobj(Aq)
+        psi0 = qt.basis(nq_dim, self.initial)
+        rho0 = psi0 * psi0.dag() # init cond rho0 = |1><1|, but with zero indexing
+        L = qt.basis(nq_dim, self.sink) * qt.basis(nq_dim, self.target).dag() # L = |n+1><t|, but with zero indexing
+        c_op = np.sqrt(gamma) * L # collapse op C = sqrt(gamma)*L
+        options = qt.Options(nsteps=1500, store_states=True, atol=1e-12, rtol=1e-12)
+        result = qt.mesolve(H, rho0, self.t, c_op, options = options) # solves the master eq
+        
+        found = False
+        for t in range(self.t_steps):
+            pq[t, :] = result.states[t].full().diagonal()[:self.sink+1].real # diagonal is the probability for the different nodes
+            prob = result.states[t].full().diagonal()[self.sink].real
+            if (prob > self.pth) and (not found):
+                pq_hitting_time = round(t * self.step_size, 6)
+                found = True
+
+        return pq_hitting_time, pq
+                
+    
+    def plot_p(self):
+        plt.plot(self.t, self.pc[:, self.target], '--', label = self.names[0], c = self.colors[0])
+        for i in range(1, len(self.p_all)-1):
+            p = self.p_all[i]
+            plt.plot(self.t, p[:, -1], label = self.names[i], c = self.colors[i])
+        plt.title('Probability in the target (sink) node, labeled ' + str(self.label))
         plt.xlabel('time')
-        plt.ylabel('ptobability')
+        plt.ylabel('probability')
+        plt.plot(self.t, np.ones(self.t_steps)*self.pth, '.', color = (0, 0, 0), label = 'pth')
         plt.legend()
-        plt.show()
 
     def animate_p(self):
         # Animate the probability over the nodes.
