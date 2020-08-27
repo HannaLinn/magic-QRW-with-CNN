@@ -44,18 +44,25 @@ def load_data(filename):
     return X_train, y_train, X_test, y_test, X_val, y_val
 
 
-dropout_rate = 0.2
+
 y_upper = 1.0
-batch_size = 3
-epochs = 2000
-colors = ['black', 'purple', 'green', 'blue']
+batch_size = 1
+epochs = 200
+colors = [(51, 51, 51), (76, 32, 110), (32, 92, 25), (32, 95, 105), (110, 32, 106), (189, 129, 9)]# ['grey', 'purple', 'green', 'blue', 'magenta', 'orange']
+colors = [tuple(t/250 for t in x) for x in colors]
 
 validation_freq = 1
 
-average_num = 2
-training_time = np.zeros((4,average_num))
+average_num = 10
+n_min_loop = 4
+n_max_loop = 8
+training_time = np.zeros((n_max_loop-n_min_loop,average_num))
+reg = (0.0, 0.0)
+dropout_rate = 0.0
+num_classes = 2
 
-for n_iter in range(4, 8):
+
+for n_iter in range(n_min_loop, n_max_loop):
 
     grande_training_loss = np.zeros((epochs, average_num))
     grande_test_accuracy = np.zeros((epochs, average_num))
@@ -65,14 +72,16 @@ for n_iter in range(4, 8):
         print('-'*20, str(average_iter), '-'*20)
         gen_data(n_max = n_iter, n = n_iter, test_size = 0.1, val_test_size = 0.0, random = False, linear = True, cyclic = False, all_graphs = True)
         X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_data.npz')
-        
-        model = ETE_ETV_Net(n_iter)
-        model = model.build(n_iter, batch_size, (2, True, (0.0, 0.0), 1., 0.2))
-        start = time.time() 
+        assert len(X_train) % batch_size == 0
+        assert len(X_test) % batch_size == 0
+
+        model = ETE_ETV_Net(n_iter, num_classes)
+        model = model.build(batch_size)
+        start = time.time()
         history = model.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2)
         end = time.time()
         vtime = end-start
-        training_time[n_iter-4, average_iter] = vtime
+        training_time[n_iter-n_min_loop, average_iter] = vtime
 
         grande_training_loss[:, average_iter] = history.history['loss']
         grande_test_accuracy[:, average_iter] = history.history['val_accuracy']
@@ -84,24 +93,24 @@ for n_iter in range(4, 8):
     training_time_average = np.average(training_time, 1)
 
     plt.figure(1)
-    plt.title('Figure 3 a) Hanna code')
+    plt.title('Figure 3 a) Hanna code, average '+ str(average_num) + ', dropout ' + str(dropout_rate) + ', reg ' + str(reg))
     plt.ylim(0.0, y_upper)
-    plt.plot(np.linspace(0.0, epochs, epochs), training_loss,'--', color = colors[n_iter-4], label = 'train loss for ' + str(n_iter) + ' nodes')
-    plt.plot(np.linspace(0.0, epochs, epochs), test_accuracy,'-', color = colors[n_iter-4], label = 'test accuracy for ' + str(n_iter) + ' nodes')
-    plt.plot(np.linspace(0.0, epochs, epochs), test_loss,'-.', color = colors[n_iter-4], label = 'test loss for ' + str(n_iter) + ' nodes')
+    plt.plot(np.linspace(0.0, epochs, epochs), training_loss,'--', color = colors[n_iter-n_min_loop], label = 'train loss for ' + str(n_iter) + ' nodes')
+    plt.plot(np.linspace(0.0, epochs, epochs), test_accuracy,'-', color = colors[n_iter-n_min_loop], label = 'test accuracy for ' + str(n_iter) + ' nodes')
+    plt.plot(np.linspace(0.0, epochs, epochs), test_loss,'-.', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss for ' + str(n_iter) + ' nodes')
     plt.xlabel('epochs')
     plt.ylabel('learning performance')
     plt.legend()
 
-plt.savefig('linear_graphs_cross_entropy_hanna' + str(average_num))
-    
+plt.savefig('linear_graphs_cross_entropy_hanna_' + str(average_num))
+
 plt.figure(2)
 plt.title('Training time, Hanna code')
-plt.plot(np.arange(4, 8), training_time_average)
+plt.plot(np.arange(n_min_loop, n_max_loop), training_time_average)
 plt.xlabel('number of nodes')
 plt.ylabel('time in seconds')
 plt.savefig('time_linear_graphs_cross_entropy_hanna' + str(average_num))
 
+
 # ------------------------------------------------
 print('-'*20, ' DONE ', '-'*20)
-plt.show()

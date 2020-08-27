@@ -112,20 +112,22 @@ def get_data():
 X_train, y_train, X_test, y_test, X_val, y_val = get_data()
 
 
-
+num_classes = 2
 
 if input('train? y/n ') =='y':
     y_upper = 1.0
     batch_size = int(input('batch size (has to be a multiple of how many train and test samples), ex 3: '))
+    assert len(X_train) % batch_size == 0
+    assert len(X_test) % batch_size == 0
     epochs = int(input('epochs: '))
     colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9)]
     
     validation_freq = 1
     n = X_train.shape[1]
     '''
+    Build : batch_size, ETE_ETV_layer = True, trainable_ETE_ETV = True, num_ETE = 2, num_neurons = 10, reg_lambdas = (0.0, 0.0), con_norm = 1., dropout_rate = 0.0
     Hyper parameters:
     model_list = [(ETE_ETV_layer, trainable_ETE_ETV, reg_lambdas = (l1, l2), con_norm, dropout_rate)]
-    1st: 0 no ete_etv_layer, 1 ete_etv_layer, 2 seq, 3 plain conv2d
 
     
     model_list = [(0),
@@ -134,13 +136,11 @@ if input('train? y/n ') =='y':
                     (3, True),
                     (False)]
     '''
-    model_list = [(2, False, (0.15, 0.45), 1., 0.2),
-                (2, True (0.15, 0.45), 1., 0.4),
-                (2, True (0.45, 0.45), 1., 0.4)]
+    model_list = [(1, False, (0.15, 0.45), 1., 0.2)]
 
-    for i in range(1):
-        model4 = ETE_ETV_Net(n)
-        model4 = model4.build(n, batch_size, model_list[i])
+    for i in range(len(model_list)):
+        model4 = ETE_ETV_Net(n, num_classes)
+        model4 = model4.build(batch_size)
         start = time.time()
         history4 = model4.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2)
         end = time.time()
@@ -159,9 +159,9 @@ if input('train? y/n ') =='y':
         plt.figure(i)
         plt.title(str(model_list[i]) + ' took time [min]: ' + str(vtime4/60))
         plt.ylim(0.0, y_upper)
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss')
+        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = tuple(t+0.1 for t in colors[i]), label = 'test loss')
         plt.plot(np.linspace(0.0, epochs, epochs), history4.history['loss'],':', color = colors[i], label = 'loss')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = tuple(t-0.3 for t in colors[n_iter-n_min_loop]), label = 'test accuracy')
+        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = tuple(t-0.1 for t in colors[i]), label = 'test accuracy')
         plt.plot(np.linspace(0.0, epochs, epochs), history4.history['accuracy'],'-.', color = colors[i], label = 'accuracy')
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
