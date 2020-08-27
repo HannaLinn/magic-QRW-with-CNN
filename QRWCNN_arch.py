@@ -99,7 +99,7 @@ class ETE_ETV_Net(tf.keras.Model):
         z = tf.keras.layers.Dense(self.num_classes)(z)
         return z
 
-    def build(self, batch_size, ETE_ETV_layer = True, trainable_ETE_ETV = True, num_ETE = 2, num_neurons = 10, reg_lambdas = (0.0, 0.0), con_norm = 1., dropout_rate = 0.0):
+    def build(self, batch_size, ETE_ETV_layer = True, trainable_ETE_ETV = True, num_ETE = 2, num_neurons = 10, reg_lambdas = (0.0, 0.0), con_norm = 1., dropout_rate = 0.0, early_stopping = False):
         inputs = tf.keras.Input(shape=(self.n, self.n, 1), batch_size=batch_size)
         
         # sequencial
@@ -115,7 +115,7 @@ class ETE_ETV_Net(tf.keras.Model):
                 
                 # delete sym part
                 x = tf.math.multiply(x, Filters.del_sym_part(shape=(self.n, self.n, 1)))
-                # ???x = layers.Conv2D(1, 4, kernel_size = 3, padding=1)(x) # line 179 
+                #x = layers.Conv2D(1, kernel_size = 3, padding='valid')(x) # line 179 
                 # ETV
                 x = self.ETV(x, batch_size, trainable_ETE_ETV, reg_lambdas, con_norm, dropout_rate)
 
@@ -153,14 +153,19 @@ class ETE_ETV_Net(tf.keras.Model):
         
         model.summary()
         
-        
-        #model.compile(optimizer='adam',s
-        #              loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-        #              metrics=['accuracy'])
         sgd = keras.optimizers.SGD(lr=0.001, decay=0., momentum=0.9)
-        model.compile(optimizer='sgd',
-                      loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
-                      metrics=['accuracy'])
+        if early_stopping:
+            callback = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=1),
+                        tf.keras.callbacks.TerminateOnNaN()]
+            model.compile(optimizer='sgd',
+                          loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+                          metrics=['accuracy'],
+                          callbacks = callbacks)
+        else:
+            model.compile(optimizer='sgd',
+                          loss=tf.keras.losses.CategoricalCrossentropy(from_logits=True),
+                          metrics=['accuracy'])
         #model.compile(optimizer='sgd', loss='mse', metrics=['accuracy'])
+
         
         return model

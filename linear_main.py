@@ -47,7 +47,7 @@ def load_data(filename):
 
 y_upper = 1.0
 batch_size = 1
-epochs = 200
+epochs = 1000
 colors = [(51, 51, 51), (76, 32, 110), (32, 92, 25), (32, 95, 105), (110, 32, 106), (189, 129, 9)]# ['grey', 'purple', 'green', 'blue', 'magenta', 'orange']
 colors = [tuple(t/250 for t in x) for x in colors]
 
@@ -95,9 +95,9 @@ for n_iter in range(n_min_loop, n_max_loop):
     plt.figure(1)
     plt.title('Figure 3 a) Hanna code, average '+ str(average_num) + ', dropout ' + str(dropout_rate) + ', reg ' + str(reg))
     plt.ylim(0.0, y_upper)
-    plt.plot(np.linspace(0.0, epochs, epochs), training_loss,'--', color = colors[n_iter-n_min_loop], label = 'train loss for ' + str(n_iter) + ' nodes')
-    plt.plot(np.linspace(0.0, epochs, epochs), test_accuracy,'-', color = colors[n_iter-n_min_loop], label = 'test accuracy for ' + str(n_iter) + ' nodes')
-    plt.plot(np.linspace(0.0, epochs, epochs), test_loss,'-.', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss for ' + str(n_iter) + ' nodes')
+    plt.plot(np.linspace(0.0, len(training_loss), len(training_loss)), training_loss,'--', color = colors[n_iter-n_min_loop], label = 'train loss for ' + str(n_iter) + ' nodes')
+    plt.plot(np.linspace(0.0, len(test_accuracy), len(test_accuracy)), test_accuracy,'-', color = colors[n_iter-n_min_loop], label = 'test accuracy for ' + str(n_iter) + ' nodes')
+    plt.plot(np.linspace(0.0, len(test_loss), len(test_loss)), test_loss,'-.', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss for ' + str(n_iter) + ' nodes')
     plt.xlabel('epochs')
     plt.ylabel('learning performance')
     plt.legend()
