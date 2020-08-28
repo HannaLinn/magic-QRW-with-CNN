@@ -13,6 +13,11 @@ from corpus_generator import *
 from QRWCNN_arch import *
 
 
+# Saving files
+import os, inspect  # for current directory
+current_file_directory = os.path.dirname(os.path.abspath(__file__))
+
+
 def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, percentage = False, random = True, linear = False, cyclic = False, all_graphs = False):
     corpus = Corpus_n(n_max = n_max, target = 1, initial = 0)
     corpus.generate_graphs(n = n, N = N, percentage = percentage, random = random, linear = linear, cyclic = cyclic, all_graphs = all_graphs)
@@ -33,7 +38,7 @@ def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, p
         X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=val_test_size)
     else:
         X_test, X_val, y_test, y_val = X_test, np.zeros((1,1)), y_test, np.zeros((1,1))
-    np.savez('train_val_test_data', X_train, y_train, X_test, y_test, X_val, y_val)
+    np.savez(current_file_directory + '/results_main' + '/train_val_test_data', X_train, y_train, X_test, y_test, X_val, y_val)
 
 def load_data(filename):
     file = np.load(filename)
@@ -81,14 +86,16 @@ def get_data():
             gen_data(n_max = n_max, n = n, N = N, test_size = test_size, val_test_size = val_test_size, percentage = percentage, random = False, cyclic = True, all_graphs = all_graphs)
         else:
             raise NameError('Type not correctly given, try again.')
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_data.npz')
-    elif input('big run, random, N5000, n25, 50/50? y/n ') == 'y':
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data.npz')
+    elif input('big run, random, N5000, n10, 50/50? y/n ') == 'y':
         val_test_size = 0.0
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_dataN5000n_5050random.npz')
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data_big.npz')
     else:
         val_test_size = 0.0
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data('train_val_test_data.npz')
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data.npz')
     
+    print('(N, n, n, C): ', X_train.shape)
+
     print('\nTraining spec.:')
     print('N_train: ', X_train.shape[0])
     q_count_train = (y_train[:,1] == 1.0).sum()
@@ -111,7 +118,6 @@ def get_data():
 
 X_train, y_train, X_test, y_test, X_val, y_val = get_data()
 
-
 num_classes = 2
 
 if input('train? y/n ') =='y':
@@ -125,48 +131,61 @@ if input('train? y/n ') =='y':
     validation_freq = 1
     n = X_train.shape[1]
     '''
-    Build : batch_size, ETE_ETV_layer = True, trainable_ETE_ETV = True, num_ETE = 2, num_neurons = 10, reg_lambdas = (0.0, 0.0), con_norm = 1., dropout_rate = 0.0
-    Hyper parameters:
-    model_list = [(ETE_ETV_layer, trainable_ETE_ETV, reg_lambdas = (l1, l2), con_norm, dropout_rate)]
+    Build : batch_size,
+    net_type = 1,
+    trainable_ETE_ETV = True,
+    num_ETE = 2,
+    num_neurons = 10,
+    reg_lambdas = (0.0, 0.0),
+    con_norm = 1000.,
+    dropout_rate = 0.0
 
-    
-    model_list = [(0),
-                    (1, True, (0.15, 0.45), 1.),
-                    (2, True, (0.15, 0.45), 1.),
-                    (3, True),
-                    (False)]
     '''
-    model_list = [(1, False, (0.15, 0.45), 1., 0.2)]
+    model_list = [(1, True, 1, 0, (0.15, 0.45), 1000., 0.0),
+                    (1, True, 2, 10, (0.0, 0.0), 1., 0.0),
+                    (1, True, 1, 10, (0.0, 0.0), 1000., 0.2),
+                    (1, True, 2, 10, (0.0, 0.0), 1000., 0.2),
+                    (3, True, 2, 10, (0.0, 0.0), 1000., 0.0)]
 
     for i in range(len(model_list)):
         model4 = ETE_ETV_Net(n, num_classes)
         model4 = model4.build(batch_size)
         start = time.time()
-        history4 = model4.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2)
+        #callbacks = [tf.keras.callbacks.EarlyStopping(monitor='accuracy', patience=10, verbose=1),
+        #            tf.keras.callbacks.TerminateOnNaN()]
+        history4 = model4.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
         end = time.time()
         vtime4 = end-start
 
         plt.figure(10)
         plt.title('All')
         plt.ylim(0.0, y_upper)
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = colors[i], label = 'test loss for ' + str(n) + ' nodes')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = colors[i], label = 'test accuracy for ' + str(n) + ' nodes')
+        y = history4.history['val_loss']
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'--', color = colors[i], label = 'test loss for ' + str(n) + ' nodes')
+        y = history4.history['val_accuracy']
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'-', color = colors[i], label = 'test accuracy for ' + str(n) + ' nodes')
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
-        plt.savefig('All')
+        plt.savefig(current_file_directory + '/results_main' +'/All')
 
         plt.figure(i)
-        plt.title(str(model_list[i]) + ' took time [min]: ' + str(vtime4/60))
+        plt.title(str(model_list[i]) + ' took time [min]: ' + str(round(vtime4/60,3)))
         plt.ylim(0.0, y_upper)
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_loss'],'--', color = tuple(t+0.1 for t in colors[i]), label = 'test loss')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['loss'],':', color = colors[i], label = 'loss')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['val_accuracy'],'-', color = tuple(t-0.1 for t in colors[i]), label = 'test accuracy')
-        plt.plot(np.linspace(0.0, epochs, epochs), history4.history['accuracy'],'-.', color = colors[i], label = 'accuracy')
+        y = history4.history['val_loss']
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'--', color = tuple(t+0.1 for t in colors[i]), label = 'test loss')
+        y = history4.history['loss']
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,':', color = colors[i], label = 'loss')
+        y = history4.history['val_accuracy']
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'-', color = tuple(t-0.1 for t in colors[i]), label = 'test accuracy')
+        y = history4.history['accuracy']
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'-.', color = colors[i], label = 'accuracy')
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
-        plt.savefig('model ' + str(i))
+        plt.savefig(current_file_directory + '/results_main' +'/model ' + str(i))
+        np.savez(current_file_directory + '/results_main' +'/training_results' + str(i), history4.history['loss'], history4.history['val_accuracy'], history4.history['val_loss'])
+
 
 
     # ------------------------------------------------
