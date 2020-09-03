@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 import time
 from corpus_generator import *
 from QRWCNN_arch import *
+from tensorflow.keras import backend as K
 
 
 # Saving files
@@ -111,7 +112,9 @@ def get_data():
     print('N_test: ', X_test.shape[0])
     q_count_test = (y_test[:,1] == 1.0).sum()
     print('q_percentage: %.2f' %(q_count_test/X_test.shape[0]))
-    
+
+    assert not np.any(np.isnan(y_test))
+    assert np.sum(y_test) == y_test.shape[0] # any ties  
 
     return X_train, y_train, X_test, y_test, X_val, y_val
 
@@ -126,7 +129,8 @@ if input('train? y/n ') =='y':
     assert len(X_train) % batch_size == 0
     assert len(X_test) % batch_size == 0
     epochs = int(input('epochs: '))
-    colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9)]
+    colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9),
+                (0.2, 0.1, 0.1), (0.8, 0.1, 0.4), (0.4, 0.2, 0.7), (0.3, 0.8, 0.6), (0.3, 0.6, 0.9)]
     
     validation_freq = 1
     n = X_train.shape[1]
@@ -139,21 +143,66 @@ if input('train? y/n ') =='y':
     reg_lambdas = (0.0, 0.0),
     con_norm = 1000.,
     dropout_rate = 0.0
-
+    
+    3 first change num_ETE
+    4th non trainable ETE_layer
+    5 - 6th change num_neurons
+    7th try regulisation lasso and ridge
+    8th try regulisation condition norm of the weights
+    9th try regularisation by dropout
+    10th plain dense network
     '''
-    model_list = [(1, True, 1, 0, (0.15, 0.45), 1000., 0.0),
-                    (1, True, 2, 10, (0.0, 0.0), 1., 0.0),
+    model_list = [(1, True, 1, 10, (0.0, 0.0), 1000., 0.0),
+                    (1, True, 2, 10, (0.0, 0.0), 1000., 0.0),
+                    (1, True, 3, 10, (0.0, 0.0), 1000., 0.0),
+                    (1, False, 1, 10, (0.0, 0.0), 1000., 0.0),
+                    (1, True, 1, 5, (0.0, 0.0), 1000., 0.0),
+                    (1, True, 1, 20, (0.0, 0.0), 1000., 0.0),
+                    (1, True, 1, 10, (0.15, 0.45), 1000., 0.0),
+                    (1, True, 1, 10, (0.0, 0.0), 1., 0.0),
                     (1, True, 1, 10, (0.0, 0.0), 1000., 0.2),
-                    (1, True, 2, 10, (0.0, 0.0), 1000., 0.2),
-                    (3, True, 2, 10, (0.0, 0.0), 1000., 0.0)]
+                    (3, True, 1, 10, (0.0, 0.0), 1000., 0.0)]
 
     for i in range(len(model_list)):
-        model4 = ETE_ETV_Net(n, num_classes)
-        model4 = model4.build(batch_size)
+        model = ETE_ETV_Net(n, num_classes)
+        model = model.build(batch_size, *model_list[i])
+        
+        
+        from tensorflow.keras.models import Model
+        data = (X_test, y_test)
+        print(X_test)
+        for layer in range(len(model.layers)):
+            intermediate_layer_model = Model(inputs=model.input,
+                                             outputs=model.layers[layer].output)
+            intermediate_output = intermediate_layer_model.predict(data)
+            intermediate_layer_model.summary()
+            print(intermediate_output)
+            
+            input()
+
+
+
+        
         start = time.time()
-        #callbacks = [tf.keras.callbacks.EarlyStopping(monitor='accuracy', patience=10, verbose=1),
-        #            tf.keras.callbacks.TerminateOnNaN()]
-        history4 = model4.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
+        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=1)]
+        history4 = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2)
+        
+        history4 = model.fit(X_train, y_train, 
+                                steps_per_epoch = 1,
+                                batch_size=1,
+                                validation_data = (X_test, y_test),
+                                validation_freq = validation_freq,
+                                epochs=epochs, verbose=2, shuffle=True)
+        
+        for layer in range(len(model.layers)):
+            intermediate_layer_model = Model(inputs=model.input,
+                                             outputs=model.layers[layer].output)
+            intermediate_output = intermediate_layer_model.predict(data)
+            intermediate_layer_model.summary()
+            print(intermediate_output)
+            
+            input()
+        
         end = time.time()
         vtime4 = end-start
 

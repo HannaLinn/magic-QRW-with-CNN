@@ -50,21 +50,21 @@ def load_data(filename):
 
 
 y_upper = 1.0
-batch_size = 3
-epochs = 500
+batch_size = 1
+epochs = 2000
 colors = [(51, 51, 51), (76, 32, 110), (32, 92, 25), (32, 95, 105), (110, 32, 106), (189, 129, 9)]# ['grey', 'purple', 'green', 'blue', 'magenta', 'orange']
 colors = [tuple(t/250 for t in x) for x in colors]
 
 validation_freq = 1
 
 average_num = 100
-n_min_loop = 7
-n_max_loop = 13
+n_min_loop = 4
+n_max_loop = 8
 training_time = np.zeros((n_max_loop-n_min_loop,average_num))
 reg = (0.0, 0.0)
 dropout_rate = 0.0
 num_classes = 2
-net_type = 3
+net_type = 1
 
 
 for n_iter in range(n_min_loop, n_max_loop):
@@ -79,11 +79,14 @@ for n_iter in range(n_min_loop, n_max_loop):
         X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results2' +'/train_val_test_data.npz')
         #assert len(X_train) % batch_size == 0
         #assert len(X_test) % batch_size == 0
+        assert not np.any(np.isnan(y_test))
+        assert np.sum(y_test) == y_test.shape[0] # any ties 
 
         model = ETE_ETV_Net(n_iter, num_classes)
         model = model.build(batch_size, net_type=net_type, num_ETE = 2)
         start = time.time()
-        history = model.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
+        history = model.fit(X_train, y_train, batch_size=batch_size, steps_per_epoch = 3, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
+        #history = model.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
         end = time.time()
         vtime = end-start
         training_time[n_iter-n_min_loop, average_iter] = vtime
@@ -96,6 +99,10 @@ for n_iter in range(n_min_loop, n_max_loop):
     test_accuracy = np.average(grande_test_accuracy, 1)
     test_loss = np.average(grande_test_loss, 1)
     training_time_average = np.average(training_time, 1)
+
+
+    dot_img_file = current_file_directory + '/results2' + '/model_arch_' + str(n_iter) + '.png'
+    tf.keras.utils.plot_model(model, to_file=dot_img_file, show_shapes=True)
 
     plt.figure(1)
     plt.title('Figure 3 a) Hanna code, average '+ str(average_num) + ', dropout ' + str(dropout_rate) + ', reg ' + str(reg) + ', net_type ' + str(net_type))
