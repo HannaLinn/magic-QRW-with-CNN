@@ -27,37 +27,44 @@ class GraphSimulation():
                     [0.0, 0.0] is a tie
             
     '''
-    def __init__(self, graph, step_size = 0.10, initial = 0, target = 1):
+    def __init__(self, graph, step_size = 0.10, initial = 0, target = 1, magic = False):
         self.A = graph[0]
         self.n = self.A.shape[0]
         self.node_list = graph[1]
-
+        self.magic = magic
         self.step_size = step_size
         #self.max_time = step_size * 1000 * self.n
-        self.max_time = 10000 * self.n
+        self.max_time = 1000 * self.n
         self.initial = initial
         self.target = target
         self.pth = 1/np.log(self.n)
         
         self.pc_hitting_time, self.pc = self.CRW_simulation() # run until finished or max_time
         
-        self.pq_hitting_time, self.pq = self.QRW_simulation(ancilla = False) # vanilla
-        self.pq_pos_hitting_time, self.pq_pos = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'positive')
-        self.pq_neg_hitting_time, self.pq_neg = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'negative')
-        self.pq_T_hitting_time, self.pq_T = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'T')
-        self.pq_H_hitting_time, self.pq_H = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'H')
+        self.pq_q_hitting_time, self.pq_q = self.QRW_simulation(ancilla = False) # vanilla
 
-        self.colors = ['grey', 'magenta', 'cyan', 'yellow', 'red', 'blue']
-        self.names = ['c', 'q', 'pos', 'neg', 'T', 'H']
+        if self.magic:
+            self.pq_pos_hitting_time, self.pq_pos = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'positive')
+            self.pq_neg_hitting_time, self.pq_neg = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'negative')
+            self.pq_T_hitting_time, self.pq_T = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'T')
+            self.pq_H_hitting_time, self.pq_H = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'H')
+            self.names = ['c', 'q', 'pos', 'neg', 'T', 'H']
+            self.colors = ['grey', 'magenta', 'cyan', 'yellow', 'red', 'blue']
+        else:
+            self.names = ['c', 'q']
+            self.colors = ['grey', 'magenta']
 
-        self.hitting_time_all = np.array([self.pc_hitting_time, self.pq_hitting_time, self.pq_pos_hitting_time, self.pq_neg_hitting_time, self.pq_T_hitting_time, self.pq_H_hitting_time])
-        self.p_all = [self.pc, self.pq, self.pq_pos, self.pq_neg, self.pq_T, self.pq_H]
+        self.hitting_time_all = np.array([self.pc_hitting_time])
+        self.p_all = np.array([self.pc])
+        for name in self.names[1:]:
+            self.hitting_time_all = np.append(self.hitting_time_all, eval('self.pq_' + name + '_hitting_time'))
+            self.p_all = np.append(self.p_all, eval('self.pq_' + name))
+        #self.hitting_time_all = np.array([self.pc_hitting_time, self.pq_hitting_time, self.pq_pos_hitting_time, self.pq_neg_hitting_time, self.pq_T_hitting_time, self.pq_H_hitting_time])
+        #self.p_all = [self.pc, self.pq, self.pq_pos, self.pq_neg, self.pq_T, self.pq_H]
         self.set_label()
 
     def set_label(self):
-        temp = np.zeros(len(self.hitting_time_all), dtype=float)
-        temp[np.argmin(self.hitting_time_all)] = 1.0
-        self.label = temp
+        self.label = np.where(self.hitting_time_all == self.hitting_time_all.min(), 1.0, 0.0)
 
     
     def CRW_simulation(self):
@@ -75,7 +82,7 @@ class GraphSimulation():
         
         t = self.step_size # don't need to calculate t = 0 as that is 0.0
         prob = 0
-        while (prob < self.pth) and (t < self.max_time):
+        while (prob < self.pth) and (t < self.max_time): # gives RuntimeWarning: underflow at t = 709, it is ok, we still want QRW-sim to run
             temp1 = np.exp(-t)
             temp2 = expm(T*t)
             temp3 = np.dot(temp2, p0)*temp1 #eq (3) Melnikov 1
@@ -127,28 +134,29 @@ class GraphSimulation():
                 pass
 
             if superposition == 'positive':
-                rho0 = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
+                rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
             elif superposition == 'negative':
-                rho0 = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
+                rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
             elif superposition == 'T':
                 beta = 0.5 * np.arccos(1/np.sqrt(3))
-                rho0 = np.cos(beta) * qt.basis(nq_dim, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq_dim, self.extra)
+                rho = np.cos(beta) * qt.basis(nq_dim, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq_dim, self.extra)
             elif superposition == 'H':
-                rho0 = np.cos(np.pi/8) * qt.basis(nq_dim, self.initial) + np.sin(np.pi/8) * qt.basis(nq_dim, self.extra)
+                rho = np.cos(np.pi/8) * qt.basis(nq_dim, self.initial) + np.sin(np.pi/8) * qt.basis(nq_dim, self.extra)
             else:
-                raise NameError('Name the type of magic state: T or H.')
-            rho0 = rho0 * rho0.dag()
+                raise NameError('Name the type of magic state: positive, negative, T, or H.')
+            rho0 = rho * rho.dag()
 
             if verbose:
-                print('Aq: ', Aq)
+                #print('Aq: ', Aq)
                 qt.hinton(rho0)
-                plt.title('$\rho_0$')
+                plt.title(superposition)
                 plt.show()
+        else:
+            psi0 = qt.basis(nq_dim, self.initial)
+            rho0 = psi0 * psi0.dag() # init cond rho0 = |1><1|, but with zero indexing
 
         # CTQW dynamics is simulated by solving the GKSL eq, with Hamiltonian H = h_bar*A^q, h_bar=1
         H = qt.Qobj(Aq)
-        psi0 = qt.basis(nq_dim, self.initial)
-        rho0 = psi0 * psi0.dag() # init cond rho0 = |1><1|, but with zero indexing
         L = qt.basis(nq_dim, self.sink) * qt.basis(nq_dim, self.target).dag() # L = |n+1><t|, but with zero indexing
         c_op = np.sqrt(gamma) * L # collapse op C = sqrt(gamma)*L
         options = qt.Options(nsteps=1500, store_states=True, atol=1e-12, rtol=1e-12)
@@ -205,8 +213,8 @@ class GraphSimulation():
         # animation function called sequentially
         def animate(t):
             pc_anim = self.pc[t,:][np.array(self.node_list)]
-            pq_anim = np.copy(self.pq[:, :self.n]) 
-            pq_anim[:, self.target] = self.pq[:, self.sink] # sink instead of target
+            pq_anim = np.copy(self.pq_q[:, :self.n]) 
+            pq_anim[:, self.target] = self.pq_q[:, self.sink] # sink instead of target
             pq_anim = pq_anim[t, :][np.array(self.node_list)] 
             pth_anim = self.pth
             pcline.set_data(np.arange(0, self.n), pc_anim)

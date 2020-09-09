@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 from graph_simulation import *
+from itertools import permutations
 
 
 class Corpus_n(object):
@@ -29,6 +30,10 @@ class Corpus_n(object):
         self.q_count = 0
     
     def gen_color_map(self, label, G):
+        '''
+        Will only color classical and quantum.
+        '''
+
         # G is a networkx object
         color_map = []
         if label[1] == 1.0: # quantum
@@ -140,14 +145,14 @@ class Corpus_n(object):
         A = nx.to_numpy_matrix(G)
         return [A, G.nodes()]
 
-    def linear_graph(self, n, all_graphs = False):
+    def linear_graph(self, n, all_graphs = False, duplicates = False):
         '''
         Returns either a list of all possible graphs or one random.
         Each element in the list has [adjecency matrix in the form of a numpy array, nodes in a list]
         '''
-        graph_list = self.gen_linear_graph_lists(n)
+        graph_list = self.gen_linear_graph_lists(n, duplicates)
         return_list = []
-        if not all_graphs:
+        if not (all_graphs or duplicates):
             graph_list = [random.choice(graph_list)]
         for g in graph_list:
             A = np.zeros((n,n))
@@ -155,16 +160,16 @@ class Corpus_n(object):
                 A[g[i], g[i+1]] = 1
                 A[g[i+1], g[i]] = 1
             return_list.append([A, g])
-        r = return_list if all_graphs else return_list[0]
+        r = return_list if (all_graphs or duplicates) else return_list[0]
         return r
 
-    def cyclic_graph(self, n, all_graphs = False):
+    def cyclic_graph(self, n, all_graphs = False, duplicates = False):
         '''
         Returns either a list of all possible graphs or one random.
         Each element in the list has [adjecency matrix in the form of a numpy array, nodes in a list]
         '''
-        r = self.linear_graph(n, all_graphs = all_graphs)
-        if all_graphs:
+        r = self.linear_graph(n, all_graphs, duplicates)
+        if all_graphs or duplicates:
             for A in r:
                 A[0][g[0], g[n-1]] = 1
                 A[0][g[n-1], g[0]] = 1
@@ -173,41 +178,46 @@ class Corpus_n(object):
             r[0][g[n-1], g[0]] = 1
         return r
 
-    def gen_linear_graph_lists(self, n):
+    def gen_linear_graph_lists(self, n, duplicates = False):
         '''
         Used in linear_graph() and cyclic_graph().
         Generate lists for making the linear graphs.
         Each list is n long, placed in an outer list.
-    
-        Returns every possible permutation of where self.initial and self.target can be placed so that it does not contain mirror symmetries.
+            
+        If duplicates is true: returns a list of lists of all permutations of 0 to n.
+        If duplicates is false: returns a list of lists every possible permutation of where self.initial and self.target can be placed so that it does not contain mirror symmetries.
         '''
         grande_list = []
-        node_list = ['0'] * n # make an empty list of the right length
-        # first place initial
-        # can only be in ciel(n/2) places
-        cont = True
-        for i in range(int(np.ceil(n/2))):
-            node_list[i] = self.initial
-            # t has n-1 places left to be in
-            for t in range(n):
-                # except if i is in the middle then t can't be on both sides of i to avoid mirror symmetry
-                cont = False if t > int(np.floor(n/2)) and n % 2 and i == int(np.floor(n/2)) else True
-                if t != i and cont:
-                    node_list[t] = self.target
-                    # fill the rest of the elements with the rest of the numbers
-                    l = 0
-                    rest = [x for x in range(0, n) if x != self.target and x != self.initial]
-                    for k in range(0, n):
-                        if k != t and k != i:
-                            node_list[k] = rest[l]
-                            l += 1
-                    # add and restart
-                    grande_list.append(node_list)
-                    node_list = ['0'] * n
-                    node_list[i] = self.initial
+        if duplicates:
+            for l in list(permutations(range(n))):
+                grande_list.append(list(l))
+        else:
+            node_list = ['0'] * n # make an empty list of the right length
+            # first place initial
+            # can only be in ciel(n/2) places
+            cont = True
+            for i in range(int(np.ceil(n/2))):
+                node_list[i] = self.initial
+                # t has n-1 places left to be in
+                for t in range(n):
+                    # except if i is in the middle then t can't be on both sides of i to avoid mirror symmetry
+                    cont = False if t > int(np.floor(n/2)) and n % 2 and i == int(np.floor(n/2)) else True
+                    if t != i and cont:
+                        node_list[t] = self.target
+                        # fill the rest of the elements with the rest of the numbers
+                        l = 0
+                        rest = [x for x in range(0, n) if x != self.target and x != self.initial]
+                        for k in range(0, n):
+                            if k != t and k != i:
+                                node_list[k] = rest[l]
+                                l += 1
+                        # add and restart
+                        grande_list.append(node_list)
+                        node_list = ['0'] * n
+                        node_list[i] = self.initial
         return grande_list
 
-    def generate_graphs(self, n, N = 10, verbose = False, percentage = False, random = True, linear = False, all_graphs = False, cyclic = False):
+    def generate_graphs(self, n, N = 10, verbose = False, percentage = False, random = True, linear = False, all_graphs = False, duplicates = False, cyclic = False, no_ties = False, magic = False):
         '''
         Not setting a percentage is faster and will lead to 15% quantum in the random case.
 
@@ -218,14 +228,14 @@ class Corpus_n(object):
                 verbose : 1  will draw the graphs
         '''
         
-        if all_graphs:
+        if all_graphs or duplicates:
             random = False
             if linear:
-                graph_list = self.linear_graph(n, all_graphs)
+                graph_list = self.linear_graph(n, all_graphs, duplicates)
             elif cyclic:
-                graph_list = self.cyclic_graph(n, all_graphs)
+                graph_list = self.cyclic_graph(n, all_graphs, duplicates)
             for graph in graph_list:
-                self.corpus_list.append(GraphSimulation(graph, initial = self.initial, target = self.target))
+                self.corpus_list.append(GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic))
             for l in self.corpus_list:
                 if l.label[1] == 1.0:
                 	self.q_count += 1
@@ -246,18 +256,21 @@ class Corpus_n(object):
                         A = np.c_[A, np.zeros((n+ghost_node, 1))]
                         A = np.r_[A, np.zeros((1, n+ghost_node+1))]
                     
-                    gcat = GraphSimulation(graph, initial = self.initial, target = self.target)
+                    gcat = GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic)
                     
                     
-                    if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
-                        self.corpus_list.append(gcat)
-                        
-                        if i % 10 == 0:
-                            print('Progress in categorisation of graphs: ', i/N, '\n')
+                    if no_ties:
+                        if np.sum(gcat.label) == 1: # throw away tie
+                            self.corpus_list.append(gcat)
+                            i += 1
+                        else:
+                            print('a Tie!')
                     else:
-                        print('any ties:', (gcat.label == np.array([0.0, 0.0])).all())
+                        self.corpus_list.append(gcat)
                         i += 1
-                    i += 1
+                    if i % 10 == 0:
+                        print('Progress in categorisation of graphs: ', i/N, '\n')
+                    
 
             else:
                 save_list = []
@@ -276,9 +289,9 @@ class Corpus_n(object):
                         A = np.r_[A, np.zeros((1, n+ghost_node+1))]
                     
                     # categorise
-                    gcat = GraphSimulation(graph, initial = self.initial, target = self.target)
+                    gcat = GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic)
                     
-                    if not (gcat.label == np.array([0.0, 0.0])).all(): # throw away tie
+                    if np.sum(gcat.label) == 1: # throw away tie
                         if gcat.label[1] > 0: # if quantum, gcat.label = [classical_advantage, quantum_advantage]
                             if self.q_count/N < percentage:
                                 self.q_count += 1
@@ -300,7 +313,7 @@ class Corpus_n(object):
                             else:
                                 self.corpus_list.append(gcat)
                     else:
-                        print('ties? ', (gcat.label == np.array([0.0, 0.0])).all())
+                        print('ties')
                     
                     i = len(self.corpus_list)
                     if i % 10 == 0:
@@ -309,7 +322,6 @@ class Corpus_n(object):
                 print('discarded classical graphs in %: ', 100*len(save_list)/N)
                 print('discarded quantum graphs in %: ', 100*len(save_list_q)/N)
 
-            print(graph)
         
 '''
 # check
