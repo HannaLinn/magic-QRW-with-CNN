@@ -62,10 +62,13 @@ class GraphSimulation():
         #self.hitting_time_all = np.array([self.pc_hitting_time, self.pq_hitting_time, self.pq_pos_hitting_time, self.pq_neg_hitting_time, self.pq_T_hitting_time, self.pq_H_hitting_time])
         #self.p_all = [self.pc, self.pq, self.pq_pos, self.pq_neg, self.pq_T, self.pq_H]
         self.set_label()
+        self.set_ranking()
 
     def set_label(self):
         self.label = np.where(self.hitting_time_all == self.hitting_time_all.min(), 1.0, 0.0)
 
+    def set_ranking(self):
+        pass
 
     
     def CRW_simulation(self):
@@ -103,8 +106,8 @@ class GraphSimulation():
                              'bidirected' (connected undirected ancillary node).
                 split : True or False (the ancillary node is connected to the initial nodes neighbours).
                 superposition :
-                              'positive' |+> = 1/sqrt(1/2) * (|i> + |e>)
-                              'negative' |-> = 1/sqrt(1/2) * (|i> - |e>)
+                              'positive' |+> = sqrt(1/2) * (|i> + |e>)
+                              'negative' |-> = sqrt(1/2) * (|i> - |e>)
                               'T' where T_state = cos(beta) * |i> + exp(1j*(pi/4)) * sin(beta) * |e>, beta = 0.5 * arccos(1/sqrt(3))), or
                               'H' where H_state = cos(np.pi/8) * |i> + sin(np.pi/8) * |e>).
         '''
@@ -135,9 +138,9 @@ class GraphSimulation():
                 pass
 
             if superposition == 'positive':
-                rho = (1/np.sqrt(1/2)) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
+                rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
             elif superposition == 'negative':
-                rho = (1/np.sqrt(1/2)) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
+                rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
             elif superposition == 'T':
                 beta = 0.5 * np.arccos(1/np.sqrt(3))
                 rho = np.cos(beta) * qt.basis(nq_dim, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq_dim, self.extra)
