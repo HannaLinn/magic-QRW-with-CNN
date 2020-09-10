@@ -65,7 +65,7 @@ class Filters():
 
 class ETE_ETV_Net(tf.keras.Model):
     
-    def __init__(self, n, num_classes = 2, net_type = 1, conv_learn = False, num_ETE = 2, num_neurons = 10, num_mse = 1, num_mee = 1):
+    def __init__(self, n, num_classes = 2, net_type = 1, conv_learn = True, num_ETE = 2, num_neurons = 10, num_mse = 1, num_mee = 1):
         super(ETE_ETV_Net, self).__init__()
         self.n = n
         self.num_classes = num_classes
@@ -94,8 +94,8 @@ class ETE_ETV_Net(tf.keras.Model):
         The convolutional layer summarizing information about the edges in the vertices.
         '''
         y = layers.Conv2D(1, (2*self.n-1, 2*self.n-1), padding='same', trainable = trainable_ETE_ETV, kernel_initializer = Filters.ETEV_kernel)(inputs)
-        y = tf.linalg.diag_part(y[:,:,:,0])
-        y = tf.expand_dims(y, axis=-1)
+        y = tf.linalg.diag_part(y[:,:,:,0]) # takes away channels
+        y = tf.expand_dims(y, axis=-1) # adding channels
         return y
 
     def dense_layers(self, inputs):
@@ -191,7 +191,6 @@ class ETE_ETV_Net(tf.keras.Model):
         
         # Dense part
         out = self.dense_layers(out)
-        #out = tf.keras.layers.Flatten()(out)
 
         model = tf.keras.models.Model(inputs, out)
         

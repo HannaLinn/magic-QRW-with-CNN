@@ -18,6 +18,9 @@ from tensorflow.keras import backend as K
 import os, inspect  # for current directory
 current_file_directory = os.path.dirname(os.path.abspath(__file__))
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+tf.config.list_physical_devices('GPU')
+
 
 def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, percentage = False, random = True, linear = False, cyclic = False, all_graphs = False):
     corpus = Corpus_n(n_max = n_max, target = 1, initial = 0)
@@ -45,10 +48,14 @@ def load_data(filename):
     file = np.load(filename)
     X_train = file['arr_0']
     y_train = file['arr_1']
-    X_test = file['arr_2']
-    y_test = file['arr_3']
-    X_val = file['arr_4']
-    y_val = file['arr_5']
+    try:
+        X_test = file['arr_2']
+        y_test = file['arr_3']
+        X_val = file['arr_4']
+        y_val = file['arr_5']
+    except:
+        X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.3)
+        X_test, X_val, y_test, y_val = X_test, np.zeros((1,1)), y_test, np.zeros((1,1))
     return X_train, y_train, X_test, y_test, X_val, y_val
 
 
@@ -91,6 +98,10 @@ def get_data():
     elif input('big run, random, N5000, n10, 50/50? y/n ') == 'y':
         val_test_size = 0.0
         X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data_big.npz')
+    elif input('BIG run, random, N10000, 50/50? y/n ') == 'y':
+        n = int(input('n: '))
+        val_test_size = 0.0
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_nomagic_corpus' + '/train_val_test_data_n_' + str(n) + '.npz')    
     else:
         val_test_size = 0.0
         X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data.npz')
@@ -121,6 +132,8 @@ def get_data():
 
 X_train, y_train, X_test, y_test, X_val, y_val = get_data()
 
+X_train, y_train, X_test, y_test, X_val, y_val = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test), tf.convert_to_tensor(X_val), tf.convert_to_tensor(y_val)
+
 num_classes = 2
 
 if input('train? y/n ') =='y':
@@ -135,14 +148,20 @@ if input('train? y/n ') =='y':
     validation_freq = 1
     n = X_train.shape[1]
     '''
-    Build : batch_size,
+    *Init* : n,
+    num_classes = 2
+
     net_type = 1,
-    trainable_ETE_ETV = True,
+    conv_learn = False,
     num_ETE = 2,
     num_neurons = 10,
+    num_mse = 1,
+    num_mee = 1.
+
+    *Build* : batch_size = 1,
     reg_lambdas = (0.0, 0.0),
     con_norm = 1000.,
-    dropout_rate = 0.0
+    dropout_rate = 0.0.
     
     3 first change num_ETE
     4th non trainable ETE_layer
@@ -152,67 +171,39 @@ if input('train? y/n ') =='y':
     9th try regularisation by dropout
     10th plain dense network
     '''
-    model_list = [(1, True, 1, 10, (0.0, 0.0), 1000., 0.0),
-                    (1, True, 2, 10, (0.0, 0.0), 1000., 0.0),
-                    (1, True, 3, 10, (0.0, 0.0), 1000., 0.0),
-                    (1, False, 1, 10, (0.0, 0.0), 1000., 0.0),
-                    (1, True, 1, 5, (0.0, 0.0), 1000., 0.0),
-                    (1, True, 1, 20, (0.0, 0.0), 1000., 0.0),
-                    (1, True, 1, 10, (0.15, 0.45), 1000., 0.0),
-                    (1, True, 1, 10, (0.0, 0.0), 1., 0.0),
-                    (1, True, 1, 10, (0.0, 0.0), 1000., 0.2),
-                    (3, True, 1, 10, (0.0, 0.0), 1000., 0.0)]
+    model_list = [[(1, True, 1, 10), ((0.0, 0.0), 1000., 0.0)],
+                    [(1, True, 2, 10), ((0.0, 0.0), 1000., 0.0)],
+                    [(1, True, 3, 10), ((0.0, 0.0), 1000., 0.0)],
+                    [(1, False, 2, 10), ((0.0, 0.0), 1000., 0.0)],
+                    [(1, True, 2, 5), ((0.0, 0.0), 1000., 0.0)],
+                    [(1, True, 2, 20), ((0.0, 0.0), 1000., 0.0)],
+                    [(1, True, 2, 10), ((0.15, 0.45), 1000., 0.0)],
+                    [(1, True, 2, 10), ((0.0, 0.0), 1., 0.0)],
+                    [(1, True, 2, 10), ((0.0, 0.0), 1000., 0.2)],
+                    [(3, True, 1, 10), ((0.0, 0.0), 1000., 0.0)]]
+
+
 
     for i in range(len(model_list)):
-        model = ETE_ETV_Net(n, num_classes)
-        model = model.build(batch_size, *model_list[i])
-        
-        
-        from tensorflow.keras.models import Model
-        data = (X_test, y_test)
-        print(X_test)
-        for layer in range(len(model.layers)):
-            intermediate_layer_model = Model(inputs=model.input,
-                                             outputs=model.layers[layer].output)
-            intermediate_output = intermediate_layer_model.predict(data)
-            intermediate_layer_model.summary()
-            print(intermediate_output)
-            
-            input()
-
-
-
+        print(*model_list[i][0])
+        print(*model_list[i][1])
+        model = ETE_ETV_Net(n, num_classes, *model_list[i][0])
+        model = model.build(batch_size, *model_list[i][1])
         
         start = time.time()
-        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, verbose=1)]
-        history4 = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2)
-        
-        history4 = model.fit(X_train, y_train, 
-                                steps_per_epoch = 1,
-                                batch_size=1,
-                                validation_data = (X_test, y_test),
-                                validation_freq = validation_freq,
-                                epochs=epochs, verbose=2, shuffle=True)
-        
-        for layer in range(len(model.layers)):
-            intermediate_layer_model = Model(inputs=model.input,
-                                             outputs=model.layers[layer].output)
-            intermediate_output = intermediate_layer_model.predict(data)
-            intermediate_layer_model.summary()
-            print(intermediate_output)
-            
-            input()
+        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='accuracy', patience=100, verbose=1)]
+        history4 = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle = True)        
         
         end = time.time()
         vtime4 = end-start
 
         plt.figure(10)
-        plt.title('All')
+        plt.title('All for n:' + str(n))
         plt.ylim(0.0, y_upper)
         y = history4.history['val_loss']
-        plt.plot(np.linspace(0.0, len(y), len(y)), y,'--', color = colors[i], label = 'test loss for ' + str(n) + ' nodes')
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'--', color = colors[i], label = 'test loss model ' + str(i))
         y = history4.history['val_accuracy']
-        plt.plot(np.linspace(0.0, len(y), len(y)), y,'-', color = colors[i], label = 'test accuracy for ' + str(n) + ' nodes')
+        plt.plot(np.linspace(0.0, len(y), len(y)), y,'-', color = colors[i], label = 'test accuracy model ' + str(i))
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
@@ -236,6 +227,12 @@ if input('train? y/n ') =='y':
         np.savez(current_file_directory + '/results_main' +'/training_results' + str(i), history4.history['loss'], history4.history['val_accuracy'], history4.history['val_loss'])
 
 
+    file1 = open(current_file_directory + '/results_main' +'/training_param.txt', 'W')
+    q_count_train = (y_train[:,1] == 1.0).sum()
+    q_count_test = (y_test[:,1] == 1.0).sum()
+    L = ['batch_size ' + str(batch_size) + '\n', 'epochs ' + str(epochs) + '\n', 'train (N, n, n, C): ' + str(X_train.shape)+ 'q_percentage: %.2f' % (q_count_train/X_train.shape[0]) + '\n', 'test (N, n, n, C): ' + str(X_test.shape)+ 'q_percentage: %.2f' %(q_count_test/X_test.shape[0]) + '\n']
+    file1.writelines(L)
+    file1.close()
 
     # ------------------------------------------------
     print('-'*20, ' DONE ', '-'*20)

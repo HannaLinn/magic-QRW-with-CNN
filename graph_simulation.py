@@ -66,6 +66,7 @@ class GraphSimulation():
     def set_label(self):
         self.label = np.where(self.hitting_time_all == self.hitting_time_all.min(), 1.0, 0.0)
 
+
     
     def CRW_simulation(self):
         pc_hitting_time = 0
@@ -80,7 +81,7 @@ class GraphSimulation():
         p0 = np.zeros((self.n,1))
         p0[self.initial] = 1
         
-        t = self.step_size # don't need to calculate t = 0 as that is 0.0
+        t = self.step_size # don't need to calculate t = 0 as that is p0
         prob = 0
         while (prob < self.pth) and (t < self.max_time): # gives RuntimeWarning: underflow at t = 709, it is ok, we still want QRW-sim to run
             temp1 = np.exp(-t)
@@ -102,10 +103,10 @@ class GraphSimulation():
                              'bidirected' (connected undirected ancillary node).
                 split : True or False (the ancillary node is connected to the initial nodes neighbours).
                 superposition :
-                              'positive' (np.sqrt(1/2) * (qt.basis(nq, self.initial) + qt.basis(nq, self.nq-1)))
-                              'negative' (np.sqrt(1/2) * (qt.basis(nq, self.initial) - qt.basis(nq, self.nq-1)))
-                              'T' (where T_state = np.cos(beta) * qt.basis(nq, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq, nq-1), beta = 0.5 * np.arccos(1/np.sqrt(3))), or
-                              'H' (where H_state = np.cos(np.pi/8) * qt.basis(nq, self.initial) + np.sin(np.pi/8) * qt.basis(nq, nq-1)).
+                              'positive' |+> = 1/sqrt(1/2) * (|i> + |e>)
+                              'negative' |-> = 1/sqrt(1/2) * (|i> - |e>)
+                              'T' where T_state = cos(beta) * |i> + exp(1j*(pi/4)) * sin(beta) * |e>, beta = 0.5 * arccos(1/sqrt(3))), or
+                              'H' where H_state = cos(np.pi/8) * |i> + sin(np.pi/8) * |e>).
         '''
         pq_hitting_time = self.step_size * 1000 * self.n
         pq = np.zeros((self.t_steps, self.n+1)) # quantum probability, dim=(time, node+1), +1 for sink
@@ -134,9 +135,9 @@ class GraphSimulation():
                 pass
 
             if superposition == 'positive':
-                rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
+                rho = (1/np.sqrt(1/2)) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
             elif superposition == 'negative':
-                rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
+                rho = (1/np.sqrt(1/2)) * (qt.basis(nq_dim, self.initial) - qt.basis(nq_dim, self.extra))
             elif superposition == 'T':
                 beta = 0.5 * np.arccos(1/np.sqrt(3))
                 rho = np.cos(beta) * qt.basis(nq_dim, self.initial) + np.exp(1j*(np.pi/4)) * np.sin(beta) * qt.basis(nq_dim, self.extra)
@@ -184,47 +185,63 @@ class GraphSimulation():
         plt.plot(self.t, np.ones(self.t_steps)*self.pth, '.', color = (0, 0, 0), label = 'pth')
         plt.legend()
 
-    def animate_p(self):
-        # Animate the probability over the nodes.
+    def animate_p(self, p_list = [0, 1]):
+        '''
+        Animate the probabilities given in p_list over the nodes.
+        [0, 1] are pc and pq.
+        ['c', 'q', 'pos', 'neg', 'T', 'H'] use the indices for the rest.
+        p_list = 'all' gives all probabilities.
+        '''
+        if p_list == 'all':
+            p_list = [0, 1, 2, 3, 4, 5] 
 
         # set up the figure, the axis, and the plot element we want to animate
         fig = plt.figure()
         ax = plt.axes(xlim=(0, self.n-1), ylim=(-0.1, 1.0))
-        pthline, = ax.plot([], [], lw=2, label= 'threshold', c = 'black')
-        pcline, = ax.plot([], [], lw=2, label= 'classical', c = 'grey')
-        pqline, = ax.plot([], [], lw=2, label = 'quantum', c = 'm')
-        target, = ax.plot([], [], mew=7, label = 'target', c = 'r', marker = 'o')
-        initial, = ax.plot([], [], mew=7, label = 'initial', c = 'y', marker = 'v')
+        pthline = ax.plot([], [], lw=2, label= 'threshold', c = 'black')[0]
+        target = ax.plot([], [], mew=7, label = 'target', c = 'r', marker = 'o')[0]
+        initial = ax.plot([], [], mew=7, label = 'initial', c = 'y', marker = 'v')[0]
+        line_list = []
+        for p in p_list:
+            line_list.append(ax.plot([], [], lw=2, label= self.names[p], c = self.colors[p])[0])
         ax.set_xlabel('nodes')
         ax.set_ylabel('probability')
-        plt.title('Probability over a line graph')
+        plt.title('Probability over a linear graph with label ' + str(self.label))
         plt.legend()
 
                                                                                                                         
         # initialization function: plot the background of each frame
         def init():
-            pcline.set_data([], [])
-            pqline.set_data([], [])
+            p_return = []
+            for p in line_list:
+                p_return.append(p.set_data([], []))
             pthline.set_data([], [])
             target.set_data([], [])
             initial.set_data([], [])
-            return pcline, pqline, target, initial, pthline
+            return target, initial, pthline, p_return
 
         # animation function called sequentially
         def animate(t):
-            pc_anim = self.pc[t,:][np.array(self.node_list)]
-            pq_anim = np.copy(self.pq_q[:, :self.n]) 
-            pq_anim[:, self.target] = self.pq_q[:, self.sink] # sink instead of target
-            pq_anim = pq_anim[t, :][np.array(self.node_list)] 
-            pth_anim = self.pth
-            pcline.set_data(np.arange(0, self.n), pc_anim)
-            pqline.set_data(np.arange(0, self.n), pq_anim)
-            pthline.set_data(np.arange(0, self.n), pth_anim)
+            p_return = []
+            for p in enumerate(p_list):
+                if p[1] == 0:
+                    pc_anim = self.pc[t,:][np.array(self.node_list)]
+                    line_list[0].set_data(np.arange(0, self.n), pc_anim)
+                else: # sink instead of target
+                    pq_p = eval('self.pq_' + self.names[p[0]])
+                    anim = np.copy(pq_p[:, :self.n]) 
+                    anim[:, self.target] = pq_p[:, self.sink] 
+                    anim = anim[t, :][np.array(self.node_list)] 
+            
+                    line_list[p[0]].set_data(np.arange(0, self.n), anim)
+                p_return.append(line_list[p[0]])
 
+
+            pthline.set_data(np.arange(0, self.n), self.pth)
             target.set_data(np.where(np.array(self.node_list) == self.target), 0)
             initial.set_data(np.where(np.array(self.node_list) == self.initial), 0)
 
-            return pcline, pqline, target, initial,
+            return target, initial, pthline, p_return
 
 
         # call the animator.  blit=True means only re-draw the parts that have changed.
@@ -236,6 +253,6 @@ class GraphSimulation():
         #anim.save('wavepacketanimation'+ str(self.n) + '.gif', writer='imagemagick', fps=30)
         # Set up formatting for the movie files
         Writer = animation.writers['ffmpeg']
-        writer = Writer(fps=30, metadata=dict(artist='Me'), bitrate=1800)
-        anim.save('wavepacketanimation'+ str(self.n) + '.mp4', writer=writer)
+        writer = Writer(fps=20, metadata=dict(artist='Me'), bitrate=1800)
+        anim.save('wavepacketanimation'+ str(self.n) + '_R' + str(np.random.randint(0,100)) + '.mp4', writer=writer) # give a random number to save all movies
 
