@@ -101,7 +101,7 @@ class ETE_ETV_Net(tf.keras.Model):
     def dense_layers(self, inputs):
         z = tf.keras.layers.Flatten()(inputs)
         z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z) # according to Melnikov code self.fc3, line 93 in cnn_arch
-        z = tf.keras.layers.Dense(self.num_classes)(z)
+        z = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')(z)
         return z
 
     def build(self, batch_size = 1, reg_lambdas = (0.0, 0.0), con_norm = 1000., dropout_rate = 0.0):

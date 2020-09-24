@@ -11,25 +11,28 @@ from sklearn.model_selection import train_test_split
 import time
 from corpus_generator import *
 from QRWCNN_arch import *
-from tensorflow.keras import backend as K
+from tensorflow.keras.utils import plot_model
 
 
 # Saving files
 import os, inspect  # for current directory
 current_file_directory = os.path.dirname(os.path.abspath(__file__))
+from sklearn.metrics import f1_score, precision_score, recall_score
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 tf.config.list_physical_devices('GPU')
 
+file_dir = current_file_directory + '/results_main'
 
-def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, percentage = False, random = True, linear = False, cyclic = False, all_graphs = False):
+
+def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, percentage = False, random = True, linear = False, cyclic = False, all_graphs = False, num_classes = 2):
     corpus = Corpus_n(n_max = n_max, target = 1, initial = 0)
-    corpus.generate_graphs(n = n, N = N, percentage = percentage, random = random, linear = linear, cyclic = cyclic, all_graphs = all_graphs)
+    corpus.generate_graphs(n = n, N = N, percentage = percentage, random = random, linear = linear, cyclic = cyclic, all_graphs = all_graphs, no_ties = True)
     print('-'*10 + ' Corpus done! ' + '-'*10)
     
     N = len(corpus.corpus_list)
     data_X = np.ones((N, n, n))
-    data_labels = np.ones((N,2))
+    data_labels = np.ones((N, num_classes))
     for i in range(N): 
         x = corpus.corpus_list[i].A
         data_X[i] = x # numpy array
@@ -42,7 +45,7 @@ def gen_data(n_max = 10, n = 5, N = 100, test_size = 0.1, val_test_size = 0.5, p
         X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=val_test_size)
     else:
         X_test, X_val, y_test, y_val = X_test, np.zeros((1,1)), y_test, np.zeros((1,1))
-    np.savez(current_file_directory + '/results_main' + '/train_val_test_data', X_train, y_train, X_test, y_test, X_val, y_val)
+    np.savez(file_dir + '/train_val_test_data', X_train, y_train, X_test, y_test, X_val, y_val)
 
 def load_data(filename):
     file = np.load(filename)
@@ -94,17 +97,21 @@ def get_data():
             gen_data(n_max = n_max, n = n, N = N, test_size = test_size, val_test_size = val_test_size, percentage = percentage, random = False, cyclic = True, all_graphs = all_graphs)
         else:
             raise NameError('Type not correctly given, try again.')
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data.npz')
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(file_dir + '/train_val_test_data.npz')
     elif input('big run, random, N5000, n10, 50/50? y/n ') == 'y':
         val_test_size = 0.0
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data_big.npz')
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(file_dir + '/train_val_test_data_big.npz')
     elif input('BIG run, random, N10000, 50/50? y/n ') == 'y':
         n = int(input('n: '))
         val_test_size = 0.0
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_nomagic_corpus' + '/train_val_test_data_n_' + str(n) + '.npz')    
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data( current_file_directory + '/results_nomagic_corpus' + '/train_val_test_data_n_' + str(n) + '.npz')    
+    elif input('MAGIC BIG run, random, N10000, 50/50? y/n ') == 'y':
+        n = int(input('n: '))
+        val_test_size = 0.0
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data( current_file_directory + '/results_magic_corpus' + '/train_val_test_data_n_' + str(n) + '.npz')    
     else:
         val_test_size = 0.0
-        X_train, y_train, X_test, y_test, X_val, y_val = load_data(current_file_directory + '/results_main' + '/train_val_test_data.npz')
+        X_train, y_train, X_test, y_test, X_val, y_val = load_data(file_dir + '/train_val_test_data.npz')
     
     print('(N, n, n, C): ', X_train.shape)
 
@@ -113,7 +120,7 @@ def get_data():
     q_count_train = (y_train[:,1] == 1.0).sum()
     print('q_percentage: %.2f' % (q_count_train/X_train.shape[0]))
     
-    if not val_test_size == 0.0:
+    if not np.all(X_val == np.zeros((1,1))):
         print('\nValidation spec.:')
         print('N_val: ', X_val.shape[0])
         q_count_val = (y_val[:,1] == 1.0).sum()
@@ -132,9 +139,10 @@ def get_data():
 
 X_train, y_train, X_test, y_test, X_val, y_val = get_data()
 
-X_train, y_train, X_test, y_test, X_val, y_val = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test), tf.convert_to_tensor(X_val), tf.convert_to_tensor(y_val)
 
-num_classes = 2
+num_classes = y_test.shape[1]
+if num_classes > 2:
+    file_dir = current_file_directory + '/results_main_magic'
 
 if input('train? y/n ') =='y':
     y_upper = 1.0
@@ -147,6 +155,18 @@ if input('train? y/n ') =='y':
     
     validation_freq = 1
     n = X_train.shape[1]
+
+
+    file1 = open(file_dir +'/training_param.txt', 'w')
+    q_count_train = (y_train[:,1] == 1.0).sum()
+    q_count_test = (y_test[:,1] == 1.0).sum()
+    L = ['batch_size: ' + str(batch_size) + '\n', 'epochs: ' + str(epochs) + '\n', 'train (N, n, n, C): ' + str(X_train.shape)+ ' q_percentage: %.2f' % (q_count_train/X_train.shape[0]) + '\n', 'test (N, n, n, C): ' + str(X_test.shape)+ ' q_percentage: %.2f' %(q_count_test/X_test.shape[0]) + '\n']
+    file1.writelines(L)
+    file1.close()
+
+    X_train, y_train, X_test, y_test, X_val, y_val = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test), tf.convert_to_tensor(X_val), tf.convert_to_tensor(y_val)
+
+
     '''
     *Init* : n,
     num_classes = 2
@@ -183,15 +203,15 @@ if input('train? y/n ') =='y':
                     [(3, True, 1, 10), ((0.0, 0.0), 1000., 0.0)]]
 
 
-
+    file1 = open(file_dir +'/f1_precision_recall.txt', 'w')
     for i in range(len(model_list)):
         print(*model_list[i][0])
         print(*model_list[i][1])
         model = ETE_ETV_Net(n, num_classes, *model_list[i][0])
         model = model.build(batch_size, *model_list[i][1])
-        
+        plot_model(model, to_file=file_dir + 'model_plot' + str(i) + 'm.png', show_shapes=True, show_layer_names=True)
         start = time.time()
-        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='accuracy', patience=100, verbose=1)]
+        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, verbose=1)]
         history4 = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle = True)        
         
         end = time.time()
@@ -207,7 +227,7 @@ if input('train? y/n ') =='y':
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
-        plt.savefig(current_file_directory + '/results_main' +'/All')
+        plt.savefig(file_dir +'/All')
 
         plt.figure(i)
         plt.title(str(model_list[i]) + ' took time [min]: ' + str(round(vtime4/60,3)))
@@ -223,15 +243,20 @@ if input('train? y/n ') =='y':
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
-        plt.savefig(current_file_directory + '/results_main' +'/model ' + str(i))
-        np.savez(current_file_directory + '/results_main' +'/training_results' + str(i), history4.history['loss'], history4.history['val_accuracy'], history4.history['val_loss'])
+        plt.savefig(file_dir +'/model ' + str(i))
+        np.savez(file_dir +'/training_results' + str(i), history4.history['loss'], history4.history['val_accuracy'], history4.history['val_loss'])
 
 
-    file1 = open(current_file_directory + '/results_main' +'/training_param.txt', 'W')
-    q_count_train = (y_train[:,1] == 1.0).sum()
-    q_count_test = (y_test[:,1] == 1.0).sum()
-    L = ['batch_size ' + str(batch_size) + '\n', 'epochs ' + str(epochs) + '\n', 'train (N, n, n, C): ' + str(X_train.shape)+ 'q_percentage: %.2f' % (q_count_train/X_train.shape[0]) + '\n', 'test (N, n, n, C): ' + str(X_test.shape)+ 'q_percentage: %.2f' %(q_count_test/X_test.shape[0]) + '\n']
-    file1.writelines(L)
+        y_pred1 = model.predict(X_val, batch_size=batch_size)
+        y_pred=np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[0])
+        for i in range(1, y_pred1.shape[0]):
+            y_pred = np.append(y_pred, np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[i]), axis = 0)
+
+        L = ['model ' + str(i) + '\n' + 
+        'precision: ' + str(precision_score(y_val, y_pred, average=None))+ '\n' +
+        'recall: ' + str(recall_score(y_val, y_pred, average=None)) +'\n' + 
+        'f1: ' + str(f1_score(y_val, y_pred, average=None)) + '\n\n\n']
+        file1.writelines(L)
     file1.close()
 
     # ------------------------------------------------
