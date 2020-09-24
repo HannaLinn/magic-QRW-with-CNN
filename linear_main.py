@@ -11,18 +11,25 @@ import time
 from corpus_generator import *
 from QRWCNN_arch import *
 import tensorflow as tf
+from tensorflow.keras.utils import plot_model
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 # Saving files
 import os, inspect  # for current directory
 current_file_directory = os.path.dirname(os.path.abspath(__file__))
 
-from tensorflowkeras.utils import plot_model
+
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 tf.config.list_physical_devices('GPU')
-file_name = current_file_directory + '/results_linear_magic'
 
 magic = False
+if magic:
+    file_name = current_file_directory + '/results_linear_magic'
+    num_classes = 6
+else:
+    file_name = current_file_directory + '/results_linear'
+    num_classes = 2
 
 def gen_data(n_max = 10, n = 5, N = 100, linear = True, cyclic = False, all_graphs = False, duplicates=False, magic=False):
     corpus = Corpus_n(n_max = n_max, target = 1, initial = 0)
@@ -31,15 +38,17 @@ def gen_data(n_max = 10, n = 5, N = 100, linear = True, cyclic = False, all_grap
     
     N = len(corpus.corpus_list)
     data_X = np.ones((N, n, n))
-    data_labels = np.ones((N,6))
-    for i in range(N): 
-        x = corpus.corpus_list[i].A
-        data_X[i] = x # numpy array
-        data_labels[i] = corpus.corpus_list[i].label/np.sum(corpus.corpus_list[i].label) # categorical, learned embedding
+    data_labels = np.ones((N,6)) if magic else np.ones((N,2))
+    for i in range(N):
+        data_X[i] = corpus.corpus_list[i].A
+        data_labels[i] = corpus.corpus_list[i].label # categorical, learned embedding
 
     data_X = data_X.reshape(N, n, n, 1) # [samples, rows, columns, channels]
     
-    np.savez(current_file_directory + '/linear_corpuses' +'/train_val_test_data' + str(n), data_X, data_labels)
+    if magic:
+        np.savez(current_file_directory + '/linear_corpuses_magic' +'/train_val_test_data' + str(n), data_X, data_labels)
+    else:
+        np.savez(current_file_directory + '/linear_corpuses' +'/train_val_test_data' + str(n), data_X, data_labels)
 
 def load_data(filename):
     file = np.load(filename)
@@ -49,7 +58,7 @@ def load_data(filename):
 
 
 y_upper = 1.0
-epochs = 1000
+epochs = 2000
 colors = [(51, 51, 51), (76, 32, 110), (32, 92, 25), (32, 95, 105), (110, 32, 106), (189, 129, 9)]# ['grey', 'purple', 'green', 'blue', 'magenta', 'orange']
 colors = [tuple(t/250 for t in x) for x in colors]
 
@@ -64,15 +73,18 @@ dropout_rate = 0.0
 batch_size = 1
 net_type = 1
 
-
+file1 = open(file_name +'/f1_precision_recall.txt', 'w')
 for n_iter in range(n_min_loop, n_max_loop):
 
     grande_training_loss = np.zeros((epochs, average_num))
     grande_test_accuracy = np.zeros((epochs, average_num))
     grande_test_loss = np.zeros((epochs, average_num))
+    grande_precision = np.zeros((num_classes, average_num))
+    grande_recall = np.zeros((num_classes, average_num))
+    grande_f1 = np.zeros((num_classes, average_num))
     
     for average_iter in range(average_num):
-        print('-'*20, str(average_iter), '-'*20)
+        print('-'*20, ' average iter: ', str(average_iter), ' n: ', str(n_iter), '-'*20)
         try:
             if magic:
                 data_X, data_labels = load_data(current_file_directory + '/linear_corpuses_magic' +'/train_val_test_data'+str(n_iter)+'.npz')
@@ -86,6 +98,8 @@ for n_iter in range(n_min_loop, n_max_loop):
                 gen_data(n_max = n_iter, n = n_iter, linear = True, cyclic = False, all_graphs = False, duplicates = True, magic = magic)
                 data_X, data_labels = load_data(current_file_directory + '/linear_corpuses'+'/train_val_test_data'+str(n_iter)+'.npz')
 
+        
+        
         test_size = 0.1
         X_train, X_test, y_train, y_test = train_test_split(data_X, data_labels, test_size=test_size)
         X_train, y_train, X_test, y_test = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test)
@@ -94,31 +108,42 @@ for n_iter in range(n_min_loop, n_max_loop):
         #assert len(X_train) % batch_size == 0
         #assert len(X_test) % batch_size == 0
         assert not np.any(np.isnan(y_test))
+        assert np.all(np.sum(y_train, axis = 1) == 1.) # no ties
         num_classes = y_test.shape[1]
 
         model = ETE_ETV_Net(n_iter, num_classes, net_type=net_type, num_ETE = 2)
         model = model.build(batch_size=batch_size)
 
-        plot_model(model, to_file=file_name + 'model_plot'+ str(n_iter) +'n.png', show_shapes=True, show_layer_names=True)
+        plot_model(model, to_file=file_name + '/model_plot'+ str(n_iter) +'n.png', show_shapes=True, show_layer_names=True)
         start = time.time()
-        history = model.fit(X_train, y_train, batch_size=batch_size, steps_per_epoch = 3, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
+        history = model.fit(X_train, y_train, batch_size=batch_size, steps_per_epoch = 3, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=1, shuffle=True)
         #history = model.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
         end = time.time()
         vtime = end-start
         training_time[n_iter-n_min_loop, average_iter] = vtime
 
+
+        y_pred1 = model.predict(X_test, batch_size=batch_size)
+        y_pred=np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[0])
+        for i in range(1, y_pred1.shape[0]):
+            y_pred = np.append(y_pred, np.eye(1, num_classes, k=np.argmax(y_pred1, axis = 1)[i]), axis = 0)
+
         grande_training_loss[:, average_iter] = history.history['loss']
         grande_test_accuracy[:, average_iter] = history.history['val_accuracy']
         grande_test_loss[:, average_iter] = history.history['val_loss']
+        grande_precision[:, average_iter] = precision_score(y_test, y_pred, average=None)
+        grande_recall[:, average_iter] = recall_score(y_test, y_pred, average=None)
+        grande_f1[:, average_iter] = f1_score(y_test, y_pred, average=None)
 
     training_loss = np.average(grande_training_loss, 1)
     test_accuracy = np.average(grande_test_accuracy, 1)
     test_loss = np.average(grande_test_loss, 1)
     training_time_average = np.average(training_time, 1)
+    precision = np.average(grande_precision, 1)
+    recall = np.average(grande_recall, 1)
+    f1 = np.average(grande_f1, 1)
 
 
-    dot_img_file = file_name + '/model_arch_' + str(n_iter) + '.png'
-    tf.keras.utils.plot_model(model, to_file=dot_img_file, show_shapes=True)
 
     plt.figure(1)
     plt.title('Figure 3 a) Hanna code, average '+ str(average_num) + ', dropout ' + str(dropout_rate) + ', reg ' + str(reg) + ', net_type ' + str(net_type))
@@ -132,6 +157,14 @@ for n_iter in range(n_min_loop, n_max_loop):
     np.savez(file_name +'/training_results' + str(n_iter), training_loss, test_accuracy, test_loss)
 
     plt.savefig(file_name+'/linear_graphs_cross_entropy_hanna_' + str(average_num))
+    
+
+    L = ['n ' + str(n_iter) + '\n' + 
+    'precision: ' + str(precision)+ '\n' +
+    'recall: ' + str(recall) +'\n' + 
+    'f1: ' + str(f1) + '\n\n\n']
+    file1.writelines(L)
+file1.close()
 
 plt.figure(2)
 plt.title('Training time, Hanna code' + ', net_type ' + str(net_type))

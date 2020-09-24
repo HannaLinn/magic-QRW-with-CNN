@@ -84,8 +84,8 @@ class ETE_ETV_Net(tf.keras.Model):
         Edge-to-edge layer that uses the ETEV_filter from the Filter class.
         The convolutional layer counts how many neighboring edges each edge has.
         '''
-        x = layers.Conv2D(1, (2*self.n-1, 2*self.n-1), padding='same', trainable = trainable_ETE_ETV, kernel_initializer = Filters.ETEV_kernel)(inputs)
-        x = tf.math.multiply(x, inputs)
+        x = layers.Conv2D(1, (2*self.n-1, 2*self.n-1), padding='same', trainable = trainable_ETE_ETV, kernel_initializer = Filters.ETEV_kernel, name = 'ETE_cross_'+str(np.random.randint(0, 1000)))(inputs)
+        x = tf.math.multiply(x, inputs, name = 'ETE_mult_'+str(np.random.randint(0, 200)))
         return x
 
     def ETV(self, inputs, batch_size, trainable_ETE_ETV):
@@ -93,9 +93,9 @@ class ETE_ETV_Net(tf.keras.Model):
         Edge-to-vertex layer that uses the ETEV_filter from the Filter class.
         The convolutional layer summarizing information about the edges in the vertices.
         '''
-        y = layers.Conv2D(1, (2*self.n-1, 2*self.n-1), padding='same', trainable = trainable_ETE_ETV, kernel_initializer = Filters.ETEV_kernel)(inputs)
-        y = tf.linalg.diag_part(y[:,:,:,0]) # takes away channels
-        y = tf.expand_dims(y, axis=-1) # adding channels
+        y = layers.Conv2D(1, (2*self.n-1, 2*self.n-1), padding='same', trainable = trainable_ETE_ETV, kernel_initializer = Filters.ETEV_kernel, name = 'ETV_cross_'+str(np.random.randint(0, 2000)))(inputs)
+        y = tf.linalg.diag_part(y[:,:,:,0], name = 'ETV_diagonal_'+str(np.random.randint(0, 200))) # takes away channels
+        y = tf.expand_dims(y, axis=-1, name = 'ETV_add_channel_'+str(np.random.randint(0, 200))) # adding channels
         return y
 
     def dense_layers(self, inputs):
@@ -117,7 +117,7 @@ class ETE_ETV_Net(tf.keras.Model):
                     # ETE
                     x = self.ETE(x, trainable_ETE_ETV = False)
                 # delete sym part
-                x = tf.math.multiply(x, Filters.del_sym_part(shape=(self.n, self.n, 1)))
+                x = tf.math.multiply(x, Filters.del_sym_part(shape=(self.n, self.n, 1)), name='delete_'+str(np.random.randint(0, 2000)))
                 
                 
                 # row 183 in mel
@@ -127,11 +127,11 @@ class ETE_ETV_Net(tf.keras.Model):
                                         padding = 'same',
                                         activation = 'relu',
                                         kernel_regularizer = regularizers.l1_l2(l1=reg_lambdas[0],l2=reg_lambdas[1]),
-                                        kernel_constraint = constraints.max_norm(con_norm))(x)
+                                        kernel_constraint = constraints.max_norm(con_norm), name='Conv2d_trainable_'+str(np.random.randint(0, 2000)))(x)
                     
                     for i_channel in range(self.num_channels):
                         # ETV
-                        x_temp = self.ETV(tf.reshape(x[:, :, :, i_channel], (batch_size, self.n, self.n, 1)), batch_size, trainable_ETE_ETV = False)
+                        x_temp = self.ETV(tf.reshape(x[:, :, :, i_channel], (batch_size, self.n, self.n, 1), name = 'ETV_channel_split_'+str(np.random.randint(0, 2000))), batch_size, trainable_ETE_ETV = False)
                         try:
                             x_out = layers.concatenate([x_out, x_temp], axis = 2)
                         except:
@@ -148,7 +148,7 @@ class ETE_ETV_Net(tf.keras.Model):
             y = inputs
             # Mark start and mark start edge
             for i_mse in range(self.num_mse):
-                y = tf.math.multiply(y, Filters.mark_start_filter(shape=(self.n, self.n, 1))) # MS
+                y = tf.math.multiply(y, Filters.mark_start_filter(shape=(self.n, self.n, 1)), name='mark_start_'+str(np.random.randint(0, 200))) # MS
                 for j_mse in range(i_mse):
                     y = tf.math.multiply(y, y) # MSE
                 y = - y[:,:,0,:] # only want initial vertex 0
@@ -161,7 +161,7 @@ class ETE_ETV_Net(tf.keras.Model):
             z = inputs
             # Mark end and Mark end edge
             for i_mee in range(self.num_mee):
-                z = tf.math.multiply(z, Filters.mark_end_filter(shape=(self.n, self.n, 1))) # ME
+                z = tf.math.multiply(z, Filters.mark_end_filter(shape=(self.n, self.n, 1)), name='mark_end_'+str(np.random.randint(0, 200))) # ME
                 for j_mee in range(i_mee):
                     z = tf.math.multiply(z, z) # MEE
                 z = - z[:,:,1,:] # only want target vertex 1

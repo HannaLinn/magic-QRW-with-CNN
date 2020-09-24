@@ -113,6 +113,31 @@ def get_data():
         val_test_size = 0.0
         X_train, y_train, X_test, y_test, X_val, y_val = load_data(file_dir + '/train_val_test_data.npz')
     
+
+
+    return X_train, y_train, X_test, y_test, X_val, y_val
+
+def delete_ties(X, y):
+    mask = np.sum(y, axis=1) != 1
+    X = np.delete(X, mask, axis=0)
+    y = np.delete(y, mask, axis=0)
+    return X, y
+
+X_train, y_train, X_test, y_test, X_val, y_val = get_data()
+
+
+num_classes = y_test.shape[1]
+if num_classes > 2:
+    file_dir = current_file_directory + '/results_main_magic'
+
+if input('train? y/n ') =='y':
+
+    print('N_train with ties: ', X_train.shape[0])
+    print('N_test with ties: ', X_test.shape[0])
+    X_train, y_train = delete_ties(X_train, y_train)
+    X_test, y_test = delete_ties(X_test, y_test)
+    X_val, y_val = delete_ties(X_val, y_val)
+
     print('(N, n, n, C): ', X_train.shape)
 
     print('\nTraining spec.:')
@@ -134,21 +159,12 @@ def get_data():
     assert not np.any(np.isnan(y_test))
     assert np.sum(y_test) == y_test.shape[0] # any ties  
 
-    return X_train, y_train, X_test, y_test, X_val, y_val
 
-
-X_train, y_train, X_test, y_test, X_val, y_val = get_data()
-
-
-num_classes = y_test.shape[1]
-if num_classes > 2:
-    file_dir = current_file_directory + '/results_main_magic'
-
-if input('train? y/n ') =='y':
     y_upper = 1.0
     batch_size = int(input('batch size (has to be a multiple of how many train and test samples), ex 3: '))
     assert len(X_train) % batch_size == 0
     assert len(X_test) % batch_size == 0
+    assert np.all(np.sum(y_train, axis = 1) == 1.) # no ties
     epochs = int(input('epochs: '))
     colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9),
                 (0.2, 0.1, 0.1), (0.8, 0.1, 0.4), (0.4, 0.2, 0.7), (0.3, 0.8, 0.6), (0.3, 0.6, 0.9)]
@@ -247,15 +263,15 @@ if input('train? y/n ') =='y':
         np.savez(file_dir +'/training_results' + str(i), history4.history['loss'], history4.history['val_accuracy'], history4.history['val_loss'])
 
 
-        y_pred1 = model.predict(X_val, batch_size=batch_size)
+        y_pred1 = model.predict(X_test, batch_size=batch_size)
         y_pred=np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[0])
-        for i in range(1, y_pred1.shape[0]):
-            y_pred = np.append(y_pred, np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[i]), axis = 0)
+        for j in range(1, y_pred1.shape[0]):
+            y_pred = np.append(y_pred, np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[j]), axis = 0)
 
         L = ['model ' + str(i) + '\n' + 
-        'precision: ' + str(precision_score(y_val, y_pred, average=None))+ '\n' +
-        'recall: ' + str(recall_score(y_val, y_pred, average=None)) +'\n' + 
-        'f1: ' + str(f1_score(y_val, y_pred, average=None)) + '\n\n\n']
+        'precision: ' + str(precision_score(y_test, y_pred, average=None))+ '\n' +
+        'recall: ' + str(recall_score(y_test, y_pred, average=None)) +'\n' + 
+        'f1: ' + str(f1_score(y_test, y_pred, average=None)) + '\n\n\n']
         file1.writelines(L)
     file1.close()
 
