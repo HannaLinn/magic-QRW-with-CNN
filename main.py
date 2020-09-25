@@ -117,10 +117,27 @@ def get_data():
 
     return X_train, y_train, X_test, y_test, X_val, y_val
 
-def delete_ties(X, y):
-    mask = np.sum(y, axis=1) != 1
-    X = np.delete(X, mask, axis=0)
-    y = np.delete(y, mask, axis=0)
+def delete_ties(X, y, batch_size):
+    mask = np.sum(y, axis=1) == 1.
+    print('\nNumber of ties: ', X.shape[0] - np.sum(mask))
+    X = X[mask]
+    y = y[mask]
+    if not (X.shape[0] % batch_size == 0):
+        size = 1
+        for i in range(batch_size+2):
+            if ((X.shape[0] - i) % batch_size == 0):
+                size = (X.shape[0] - i)
+                break
+        X = X[:size, :, :, :]
+
+    if not (y.shape[0] % batch_size == 0):
+        size = 1
+        for i in range(batch_size+2):
+            if ((y.shape[0] - i) % batch_size == 0):
+                size = (y.shape[0] - i)
+                break
+        y = y[:size]
+
     return X, y
 
 X_train, y_train, X_test, y_test, X_val, y_val = get_data()
@@ -132,11 +149,14 @@ if num_classes > 2:
 
 if input('train? y/n ') =='y':
 
-    print('N_train with ties: ', X_train.shape[0])
+    batch_size = int(input('\nbatch size (has to be a multiple of how many train and test samples), ex 3: '))
+    epochs = int(input('epochs: '))
+
+    print('\nN_train with ties: ', X_train.shape[0])
     print('N_test with ties: ', X_test.shape[0])
-    X_train, y_train = delete_ties(X_train, y_train)
-    X_test, y_test = delete_ties(X_test, y_test)
-    X_val, y_val = delete_ties(X_val, y_val)
+    X_train, y_train = delete_ties(X_train, y_train, batch_size)
+    X_test, y_test = delete_ties(X_test, y_test, batch_size)
+    X_val, y_val = delete_ties(X_val, y_val, batch_size)
 
     print('(N, n, n, C): ', X_train.shape)
 
@@ -157,21 +177,19 @@ if input('train? y/n ') =='y':
     print('q_percentage: %.2f' %(q_count_test/X_test.shape[0]))
 
     assert not np.any(np.isnan(y_test))
-    assert np.sum(y_test) == y_test.shape[0] # any ties  
-
+    assert np.sum(y_test) == y_test.shape[0] # any ties
 
     y_upper = 1.0
-    batch_size = int(input('batch size (has to be a multiple of how many train and test samples), ex 3: '))
+    
     assert len(X_train) % batch_size == 0
     assert len(X_test) % batch_size == 0
     assert np.all(np.sum(y_train, axis = 1) == 1.) # no ties
-    epochs = int(input('epochs: '))
+    
     colors = [(0.1, 0.1, 0.1), (0.9, 0.1, 0.4), (0.3, 0.2, 0.7), (0.2, 0.8, 0.6), (0.2, 0.6, 0.9),
                 (0.2, 0.1, 0.1), (0.8, 0.1, 0.4), (0.4, 0.2, 0.7), (0.3, 0.8, 0.6), (0.3, 0.6, 0.9)]
     
     validation_freq = 1
     n = X_train.shape[1]
-
 
     file1 = open(file_dir +'/training_param.txt', 'w')
     q_count_train = (y_train[:,1] == 1.0).sum()
@@ -207,8 +225,7 @@ if input('train? y/n ') =='y':
     9th try regularisation by dropout
     10th plain dense network
     '''
-    model_list = [[(1, True, 1, 10), ((0.0, 0.0), 1000., 0.0)],
-                    [(1, True, 2, 10), ((0.0, 0.0), 1000., 0.0)],
+    model_list = [[(1, True, 2, 10), ((0.0, 0.0), 1000., 0.0)],
                     [(1, True, 3, 10), ((0.0, 0.0), 1000., 0.0)],
                     [(1, False, 2, 10), ((0.0, 0.0), 1000., 0.0)],
                     [(1, True, 2, 5), ((0.0, 0.0), 1000., 0.0)],
@@ -227,7 +244,7 @@ if input('train? y/n ') =='y':
         model = model.build(batch_size, *model_list[i][1])
         plot_model(model, to_file=file_dir + 'model_plot' + str(i) + 'm.png', show_shapes=True, show_layer_names=True)
         start = time.time()
-        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=100, verbose=1)]
+        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=7, verbose=1, min_delta = 0.0001), tf.keras.callbacks.TerminateOnNaN()]
         history4 = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle = True)        
         
         end = time.time()
@@ -247,7 +264,7 @@ if input('train? y/n ') =='y':
 
         plt.figure(i)
         plt.title(str(model_list[i]) + ' took time [min]: ' + str(round(vtime4/60,3)))
-        plt.ylim(0.0, y_upper)
+        #plt.ylim(0.0, y_upper)
         y = history4.history['val_loss']
         plt.plot(np.linspace(0.0, len(y), len(y)), y,'--', color = tuple(t+0.1 for t in colors[i]), label = 'test loss')
         y = history4.history['loss']
