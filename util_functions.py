@@ -6,25 +6,37 @@ from corpus_generator import *
 from QRWCNN_arch import *
 from tensorflow.keras.utils import plot_model
 
+'''
 def load_data(filename):
     file = np.load(filename)
     X_train = file['arr_0']
     y_train = file['arr_1']
     try:
-        X_test = file['arr_2']
-        y_test = file['arr_3']
-        X_val = file['arr_4']
-        y_val = file['arr_5']
+        X_test = np.concatenate((file['arr_2'], file['arr_4']), axis=0)
+        y_test = np.concatenate((file['arr_3'], file['arr_5']), axis=0)
+        assert np.sum(file['arr_3']) == file['arr_3'].shape[0] # any ties
     except:
         X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.3)
-        X_test, X_val, y_test, y_val = X_test, np.zeros((1,1)), y_test, np.zeros((1,1))
-    return X_train, y_train, X_test, y_test, X_val, y_val
+    return X_train, y_train, X_test, y_test
+'''
+def load_data(filename):
+    file = np.load(filename)
+    data_X = file['arr_0']
+    data_labels = file['arr_1']
+    try:
+        data_ranking = file['arr_2']
+        return data_X, data_labels, data_ranking
+    except:
+        return data_X, data_labels
 
-def delete_ties(X, y, batch_size):
+def delete_ties(X, y):
     mask = np.sum(y, axis=1) == 1.
     print('\nNumber of ties: ', X.shape[0] - np.sum(mask))
     X = X[mask]
     y = y[mask]
+    return X, y
+
+def div_by_batch_size(X, y, batch_size):
     if not (X.shape[0] % batch_size == 0):
         size = 1
         for i in range(batch_size+2):
@@ -32,16 +44,25 @@ def delete_ties(X, y, batch_size):
                 size = (X.shape[0] - i)
                 break
         X = X[:size, :, :, :]
-
-    if not (y.shape[0] % batch_size == 0):
-        size = 1
-        for i in range(batch_size+2):
-            if ((y.shape[0] - i) % batch_size == 0):
-                size = (y.shape[0] - i)
-                break
-        y = y[:size]
-
+        y = y[:size, :]
     return X, y
+
+def rinse_out(X, y, label, num_rinse):
+    mask1 = np.all(y == label, axis = 1)
+    mask2 = np.ones(y.shape[0], dtype='bool')
+    r = 0
+    num = 0
+    while r < num_rinse:
+        mask2[num] = False if mask1[num] else True
+        r += 1 if mask1[num] else 0
+        num += 1
+        if num >= X.shape[0]:
+            print('YOU HAVE TAKEN THEM ALL!')
+            break
+    X = X[mask2]
+    y = y[mask2]
+    return X, y
+
 
 def choose_types(comp_list, data_ranking):
     mask = np.zeros(data_ranking.shape[1], dtype=bool)

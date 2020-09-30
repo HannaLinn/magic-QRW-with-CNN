@@ -65,7 +65,7 @@ class Filters():
 
 class ETE_ETV_Net(tf.keras.Model):
     
-    def __init__(self, n, num_classes = 2, net_type = 1, conv_learn = True, num_ETE = 2, num_neurons = 10, num_mse = 1, num_mee = 1):
+    def __init__(self, n, num_classes = 2, net_type = 1, conv_learn = True, num_ETE = 2, num_neurons = 10, depth_of_dense=1, num_mse = 1, num_mee = 1):
         super(ETE_ETV_Net, self).__init__()
         self.n = n
         self.num_classes = num_classes
@@ -74,6 +74,7 @@ class ETE_ETV_Net(tf.keras.Model):
         self.conv_learn = conv_learn # layer inbetween ETE and ETV
         self.num_ETE = num_ETE
         self.num_neurons = num_neurons
+        self.depth_of_dense = depth_of_dense
         self.num_mse = num_mse
         self.num_mee = num_mee
         self.num_filters = num_ETE * self.num_channels + num_mse + num_mee
@@ -101,6 +102,8 @@ class ETE_ETV_Net(tf.keras.Model):
     def dense_layers(self, inputs):
         z = tf.keras.layers.Flatten()(inputs)
         z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z) # according to Melnikov code self.fc3, line 93 in cnn_arch
+        for i in range(self.depth_of_dense):
+            z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z)
         z = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')(z)
         #z = tf.keras.layers.Dense(self.num_classes)(z)
         return z
@@ -174,31 +177,42 @@ class ETE_ETV_Net(tf.keras.Model):
             # put everything on a pile
             out = layers.concatenate([x_out, y_out, z_out], axis = 2)
 
+            if dropout_rate != 0.0:
+                out = tf.keras.layers.Dropout(dropout_rate)(out)
+            
+            # Dense part
+            out = self.dense_layers(out)
+
         # 2 plain layers
         elif self.net_type == 2:
-            print('plain layers')
+            print('plain Conv2D layers')
+            x = inputs
             x = tf.keras.layers.Conv2D(self.n, (3,3))(inputs)
-            out = tf.keras.layers.Conv2D(self.n, (3,3))(x)
+            x = tf.keras.layers.Conv2D(self.num_neurons, (3,3))(inputs)
+            x = tf.keras.layers.Conv2D(self.num_neurons, (3,3))(inputs)
+            out = tf.keras.layers.Conv2D(self.num_neurons, (3,3))(x)
+
+            if dropout_rate != 0.0:
+                out = tf.keras.layers.Dropout(dropout_rate)(out)
+            
+            # Dense part
+            out = self.dense_layers(out)
 
         # no initial convolution layers
         else: 
             print('No conv layers!')
-            input()
-            out = inputs
-        
-
-        if dropout_rate != 0.0:
-            out = tf.keras.layers.Dropout(dropout_rate)(out)
-        
-        # Dense part
-        out = self.dense_layers(out)
+            z = tf.keras.layers.Flatten()(inputs)
+            z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z) # according to Melnikov code self.fc3, line 93 in cnn_arch
+            for i in range(self.depth_of_dense):
+                z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z)
+            out = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')(z)
 
         model = tf.keras.models.Model(inputs, out)
         
         model.summary()
         
-        #opt = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=False)
-        opt = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
+        opt = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
+        #opt = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
 
         model.compile(optimizer = opt,
                       loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False),

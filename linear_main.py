@@ -30,7 +30,7 @@ comp_list = [0, 1]
 num_classes = len(comp_list)
 names = [names[x] for x in comp_list]
 
-magic = False
+magic = True
 if magic:
     file_name = current_file_directory + '/results_linear_magic'
 else:
@@ -104,8 +104,8 @@ colors = [tuple(t/250 for t in x) for x in colors]
 validation_freq = 1
 
 average_num = 50
-n_min_loop = 4
-n_max_loop = 5
+n_min_loop = 7
+n_max_loop = 9
 training_time = np.zeros((n_max_loop-n_min_loop,average_num))
 reg = (0.0, 0.0)
 dropout_rate = 0.0

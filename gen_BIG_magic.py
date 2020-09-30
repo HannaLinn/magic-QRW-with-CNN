@@ -9,9 +9,9 @@ import os, inspect  # for current directory
 current_file_directory = os.path.dirname(os.path.abspath(__file__))
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-n_min = 17
-n_max = 25
-N = 1000
+n_min = 15
+n_max = 16
+N = 10000
 
 time_array = np.zeros(n_max - n_min)
 
@@ -38,6 +38,6 @@ for n in range(n_min, n_max):
  
     np.savez(current_file_directory + '/results_magic_corpus_ranking' + '/train_val_test_data_n_' + str(n), data_X, data_labels, data_ranking)
 
-    np.savez(current_file_directory + '/results_magic_corpus_ranking' + '/time_N' + str(N), time_array)
+    #np.savez(current_file_directory + '/results_magic_corpus_ranking' + '/time_N' + str(N), time_array)
 
 print('DONE!')
