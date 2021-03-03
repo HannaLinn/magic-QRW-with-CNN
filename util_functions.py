@@ -1,3 +1,15 @@
+
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Jun  7 18:53:11 2020
+
+@author: hanna
+
+Utility functions.
+
+TODO:
+Put more stuff here.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split

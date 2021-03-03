@@ -13,14 +13,19 @@ from graph_simulation import *
 from itertools import permutations
 
 
+'''
+Generate a list of classified graphs.
+TODO: Missing comments and some functions needs a look over.
+'''
+
 class Corpus_n(object):
     '''
-    Builds the corpus with the help of the Graph class.
+    Builds the corpus with the help of the Graph class from graph_simulation.
     The size of the adjecency graphs is constant, n_max, and nodes can be unconnected.
     
     The adjecency matrices can be extracted once the corpus is built by using: corpus.corpus_list[i].A .
     The label of quantum advantage or not, can be extracted once the corpus is built by using: corpus.corpus_list[i].label 
-    where [classical_advantage, quantum_advantage].
+    where [classical_advantage, quantum_advantage, ...].
     '''
     def __init__(self, n_max, initial = 0, target = 1):
         self.corpus_list = []
@@ -31,6 +36,7 @@ class Corpus_n(object):
     
     def gen_color_map(self, label, G):
         '''
+        Not finished.
         Will only color classical and quantum.
         '''
 
@@ -137,7 +143,7 @@ class Corpus_n(object):
 
     def random_graph(self, n):
         '''
-        Returns [adjecency matrix in the form of a numpy array, nodes in a list]
+        Returns a list with [adjecency matrix in the form of a numpy array, nodes in a list].
         '''
         top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
         m = random.randint(n-1, top_edges) # number of edges
