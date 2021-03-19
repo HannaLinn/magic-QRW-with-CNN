@@ -68,9 +68,11 @@ now_testing = '_plainCONV_network_lr_0_001_largerdataset_epochs2000_bz100_n10'
 
 
 if not magic:
-    data_X, data_labels = load_data( current_file_directory + '/results_nomagic_corpus' + '/train_val_test_data_n_' + str(n) + '.npz')    
+    #data_X, data_labels = load_data( current_file_directory + '/results_nomagic_corpus' + '/train_val_test_data_n_' + str(n) + '.npz')
+    data_X, data_labels = load_data( current_file_directory + '/datasets' + '/train_val_test_data_n_' + str(n) + '.npz')    
 else:
-    data_X, data_labels, data_ranking = load_data( current_file_directory + '/results_magic_corpus_ranking' + '/train_val_test_data_n_' + str(n) + '.npz')    
+    #data_X, data_labels, data_ranking = load_data( current_file_directory + '/results_magic_corpus_ranking' + '/train_val_test_data_n_' + str(n) + '.npz')
+    data_X, data_labels, data_ranking = load_data( current_file_directory + '/datasets' + '/train_val_test_data_n_' + str(n) + '.npz')    
     data_labels = choose_types(comp_list, data_ranking)
 
 #data_X, data_labels, data_ranking = load_data(file_dir + '/train_val_test_data_big.npz')
