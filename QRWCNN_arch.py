@@ -205,7 +205,8 @@ class ETE_ETV_Net(tf.keras.Model):
             z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z) # according to Melnikov code self.fc3, line 93 in cnn_arch
             for i in range(self.depth_of_dense):
                 z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z)
-            out = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')(z)
+            outlayer = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')
+            out = outlayer(z)
 
         model = tf.keras.models.Model(inputs, out)
         

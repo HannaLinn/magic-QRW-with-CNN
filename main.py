@@ -29,7 +29,7 @@ file_dir = current_file_directory + '/results'
 n = 5
 magic = True
 names = ['c', 'q', 'positive', 'negative', 'T', 'H']
-comp_list = [1, 2] 
+comp_list = [0, 1] 
 num_classes = len(comp_list)
 names = [names[x] for x in comp_list]
 
@@ -90,7 +90,7 @@ print('\nData spec.:')
 print('N_train: ', data_X.shape[0])
 q_count_train = (data_labels[:,1] == 1.0).sum()
 print(names[1], '_percentage: %.2f' % (q_count_train/data_labels.shape[0]))
-input()
+#input()
 
 grande_train_loss = np.zeros((epochs, average_num))
 grande_train_accuracy = np.zeros((epochs, average_num))
@@ -148,7 +148,8 @@ for average_iter in range(average_num):
     #plot_model(model, to_file=file_dir + 'model_plot' + str(i) + 'm.png', show_shapes=True, show_layer_names=True)
     start = time.time()
     callbacks = [tf.keras.callbacks.TerminateOnNaN()]
-    history = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle = True)        
+    print('start fitting')
+    history = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=1, shuffle = True)        
     
     end = time.time()
     vtime4 = end-start
@@ -185,7 +186,7 @@ for average_iter in range(average_num):
     plt.savefig(file_dir +'/model' + now_testing)
     np.savez(file_dir +'/train_results', history.history['loss'], history.history['val_accuracy'], history.history['val_loss'])
     '''
-
+print('y_pred \n',y_pred)
 '''
 
 train_loss = np.average(grande_train_loss, 1)
