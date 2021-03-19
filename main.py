@@ -144,7 +144,9 @@ for average_iter in range(average_num):
     print('-'*20, ' average iter: ', str(average_iter), ' n: ', str(n), '-'*20)
 
     model = ETE_ETV_Net(n, num_classes, *model_list[i][0])
+    print('made a net')
     model = model.build(batch_size, *model_list[i][1])
+    print('made a model')
     #plot_model(model, to_file=file_dir + 'model_plot' + str(i) + 'm.png', show_shapes=True, show_layer_names=True)
     start = time.time()
     callbacks = [tf.keras.callbacks.TerminateOnNaN()]
