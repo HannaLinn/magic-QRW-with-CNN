@@ -24,9 +24,9 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #tf.config.list_physical_devices('GPU')
 
-file_dir = current_file_directory + '/results_main'
+file_dir = current_file_directory + '/results'
 
-n = 4
+n = 5
 magic = True
 names = ['c', 'q', 'positive', 'negative', 'T', 'H']
 comp_list = [1, 2] 
@@ -131,14 +131,14 @@ for average_iter in range(average_num):
 
 
     validation_freq = 1
-
+    '''
     file2 = open(file_dir +'/train_param.txt', 'w')
     q_count_train = (y_train[:,1] == 1.0).sum()
     q_count_test = (y_test[:,1] == 1.0).sum()
     L = ['batch_size: ' + str(batch_size) + '\n', 'epochs: ' + str(epochs) + '\n', 'train (N, n, n, C): ' + str(X_train.shape)+ ' q_percentage: %.2f' % (q_count_train/X_train.shape[0]) + '\n', 'test (N, n, n, C): ' + str(X_test.shape)+ ' q_percentage: %.2f' %(q_count_test/X_test.shape[0]) + '\n']
     file2.writelines(L)
     file2.close()
-
+	'''
     X_train, y_train, X_test, y_test, = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test)
 
     print('-'*20, ' average iter: ', str(average_iter), ' n: ', str(n), '-'*20)
@@ -157,6 +157,8 @@ for average_iter in range(average_num):
     y_pred=np.eye(1, num_classes, k=np.argmax(y_pred1, axis =1)[0])
     for pred in range(1, y_pred1.shape[0]):
         y_pred = np.append(y_pred, np.eye(1, num_classes, k=np.argmax(y_pred1, axis = 1)[pred]), axis = 0)
+
+    '''
 
     grande_train_loss[:, average_iter] = history.history['loss']
     grande_test_accuracy[:, average_iter] = history.history['val_accuracy']
@@ -182,8 +184,9 @@ for average_iter in range(average_num):
     plt.legend()
     plt.savefig(file_dir +'/model' + now_testing)
     np.savez(file_dir +'/train_results', history.history['loss'], history.history['val_accuracy'], history.history['val_loss'])
+    '''
 
-
+'''
 
 train_loss = np.average(grande_train_loss, 1)
 test_accuracy = np.average(grande_test_accuracy, 1)
@@ -201,6 +204,7 @@ L = ['model ' + str(i) + '\n' +
 file1.writelines(L)
 file1.close()
 
+
 plt.figure(2)
 plt.title(str(model_list[i]) + ' random with types '  + str(names) + 'n: ' + str(n))
 plt.ylim(0.0, y_upper)
@@ -214,7 +218,7 @@ plt.legend()
 np.savez(file_dir +'/train_results' + str(n), train_loss, test_accuracy, train_loss, test_loss)
 
 plt.savefig(file_dir+'/random_graphs_' + str(average_num) + now_testing)
-
+'''
 # ------------------------------------------------
 print('-'*20, ' DONE ', '-'*20)
-plt.show()
+#plt.show()
