@@ -151,6 +151,7 @@ for average_iter in range(average_num):
     print('start fitting')
     history = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=1, shuffle = True)        
     
+    print(model.outpulayer.get_weights())
     end = time.time()
     vtime4 = end-start
 
