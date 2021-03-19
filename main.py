@@ -26,16 +26,16 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 file_dir = current_file_directory + '/results_main'
 
-n = 15
+n = 4
 magic = True
 names = ['c', 'q', 'positive', 'negative', 'T', 'H']
-comp_list = [1, 3] 
+comp_list = [1, 2] 
 num_classes = len(comp_list)
 names = [names[x] for x in comp_list]
 
 batch_size = 100
-epochs = 2000
-average_num = 10
+epochs = 20
+average_num = 1
 
 '''
 *Init* : n,
