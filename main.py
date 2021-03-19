@@ -139,6 +139,7 @@ for average_iter in range(average_num):
     file2.writelines(L)
     file2.close()
 	'''
+	print('this far?')
     X_train, y_train, X_test, y_test, = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test)
 
     print('-'*20, ' average iter: ', str(average_iter), ' n: ', str(n), '-'*20)
