@@ -21,7 +21,7 @@ import os, inspect  # for current directory
 current_file_directory = os.path.dirname(os.path.abspath(__file__))
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #tf.config.list_physical_devices('GPU')
 
 file_dir = current_file_directory + '/results'
@@ -34,7 +34,7 @@ num_classes = len(comp_list)
 names = [names[x] for x in comp_list]
 
 batch_size = 100
-epochs = 20
+epochs = 2
 average_num = 1
 
 '''
@@ -139,7 +139,7 @@ for average_iter in range(average_num):
     file2.writelines(L)
     file2.close()
 	'''
-	print('this far?')
+    print('this far?')
     X_train, y_train, X_test, y_test, = tf.convert_to_tensor(X_train), tf.convert_to_tensor(y_train), tf.convert_to_tensor(X_test), tf.convert_to_tensor(y_test)
 
     print('-'*20, ' average iter: ', str(average_iter), ' n: ', str(n), '-'*20)
@@ -154,7 +154,7 @@ for average_iter in range(average_num):
     print('start fitting')
     history = model.fit(X_train, y_train, callbacks=callbacks, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=1, shuffle = True)        
     
-    print(model.outpulayer.get_weights())
+    print(model.layers[-1].get_weights())
     end = time.time()
     vtime4 = end-start
 
