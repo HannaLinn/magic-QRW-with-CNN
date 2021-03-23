@@ -20,6 +20,8 @@ from util_functions import *
 import os, inspect  # for current directory
 current_file_directory = os.path.dirname(os.path.abspath(__file__))
 
+save_directory = current_file_directory + '/results' + '/random_graph_results'
+
 #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #tf.config.list_physical_devices('GPU')
 
@@ -28,11 +30,6 @@ comp_list = [0, 1]
 num_classes = len(comp_list)
 names = [names[x] for x in comp_list]
 
-magic = False
-file_name = current_file_directory + '/results'
-
-
-y_upper = 1.0 # for plotting
 epochs = 10
 colors = [(51, 51, 51), (76, 32, 110), (32, 92, 25), (32, 95, 105), (110, 32, 106), (189, 129, 9)]# ['grey', 'purple', 'green', 'blue', 'magenta', 'orange']
 colors = [tuple(t/250 for t in x) for x in colors] # only relevant colors
@@ -51,8 +48,6 @@ N = 10000
 
 '''
 *Init ANN* :
-n,
-num_classes = 2
 net_type = 1,
 conv_learn = False,
 num_ETE = 2,
@@ -61,16 +56,15 @@ depth = 1,
 num_mse = 1,
 num_mee = 1.
 
-*Build* : batch_size = 1,
+*Build* :
 reg_lambdas = (0.0, 0.0),
 con_norm = 1000.,
 dropout_rate = 0.0.
 '''
+num_neurons = 10
+model_list = [[(1, True, 2, num_neurons, 3), ((0.0, 0.0), 1000., 0.2)]]
 
-model_list = [[(1, True, 2, 10, 3), ((0.0, 0.0), 1000., 0.2)]]
-
-
-file1 = open(file_name +'/f1_precision_recall.txt', 'w')
+file1 = open(save_directory +'/f1_precision_recall.txt', 'w')
 for n_iter in range(n_min_loop, n_max_loop):
 
     grande_training_loss = np.zeros((epochs, average_num))
@@ -83,22 +77,15 @@ for n_iter in range(n_min_loop, n_max_loop):
     for average_iter in range(average_num):
         print('-'*20, ' average iter: ', str(average_iter), ' n: ', str(n_iter), '-'*20)
         try:
-            if magic:
-                data_X, data_labels, data_ranking = load_data(current_file_directory + '/linear_corpuses_magic' +'/train_val_test_data'+str(n_iter)+'.npz')
-            else:
-                data_X, data_labels, data_ranking = load_data(current_file_directory + '/linear_corpuses' +'/train_val_test_data'+str(n_iter)+'.npz')
+            data_X, data_labels, data_ranking = load_data(current_file_directory + '/datasets/random_graph_datasets' +'/train_val_test_data_n_'+str(n_iter)+'.npz')
         except:
-            if magic:
-                gen_data(N = N, n_max = n_iter, n = n_iter, linear = True, cyclic = False, all_graphs = False, duplicates = False, magic = True)
-                data_X, data_labels, data_ranking = load_data(current_file_directory + '/linear_corpuses_magic'+'/train_val_test_data'+str(n_iter)+'.npz')
-            else:
-                gen_data(n_max = n_iter, n = n_iter, linear = True, cyclic = False, all_graphs = False, duplicates = True, magic = magic)
-                data_X, data_labels, data_ranking = load_data(current_file_directory + '/linear_corpuses'+'/train_val_test_data'+str(n_iter)+'.npz')
-
+            gen_data(N = N, n_max = n_iter, n = n_iter, linear = False, random = True, cyclic = False, all_graphs = False, duplicates = False, magic = True)
+            data_X, data_labels, data_ranking = load_data(current_file_directory + '/datasets/random_graph_datasets'+'/train_val_test_data_n_'+str(n_iter)+'.npz')
+            
         print(data_X.shape[0])
         data_labels = choose_types(comp_list, data_ranking)
         data_X, data_labels = delete_ties(data_X, data_labels)
-        #data_X, data_labels = rinse_out(data_X, data_labels, np.array([1., 0.]), 4000)      
+        data_X, data_labels = rinse_out(data_X, data_labels, np.array([1., 0.]), 4000) # change me
         print(data_X.shape[0])
 
         test_size = 0.1
@@ -114,7 +101,7 @@ for n_iter in range(n_min_loop, n_max_loop):
         print(names[1], '_percentage: %.2f' % (q_count_train/X_train.shape[0]))
         #input()
 
-        file2 = open(file_name +'/train_param' + str(n_iter) +'.txt', 'w')
+        file2 = open(save_directory +'/train_param' + str(n_iter) +'.txt', 'w')
         q_count_train = (y_train[:,1] == 1.0).sum()
         q_count_test = (y_test[:,1] == 1.0).sum()
         L = ['batch_size: ' + str(batch_size) + '\n', 'epochs: ' + str(epochs) + '\n', 'train (N, n, n, C): ' + str(X_train.shape)+ ' q_percentage: %.2f' % (q_count_train/X_train.shape[0]) + '\n', 'test (N, n, n, C): ' + str(X_test.shape)+ ' q_percentage: %.2f' %(q_count_test/X_test.shape[0]) + '\n']
@@ -132,17 +119,21 @@ for n_iter in range(n_min_loop, n_max_loop):
 
         model = ETE_ETV_Net(n_iter, num_classes, *model_list[0][0])
         model = model.build(batch_size, *model_list[0][1])
-        #plot_model(model, to_file=file_name + '/model_plot'+ str(n_iter) +'n.png', show_shapes=True, show_layer_names=True)
+        #plot_model(model, to_file=save_directory + '/model_plot'+ str(n_iter) +'n.png', show_shapes=True, show_layer_names=True) # plot archtecture of net
         start = time.time()
-        history = model.fit(X_train, y_train, batch_size=batch_size, steps_per_epoch = 3, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
+        #history = model.fit(X_train, y_train, batch_size=batch_size, steps_per_epoch = 3, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle=True)
 
-        #history = model.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle = True)
+        history = model.fit(X_train, y_train, batch_size=batch_size, validation_data = (X_test, y_test), validation_freq = validation_freq, epochs=epochs, verbose=2, shuffle = True)
 
         end = time.time()
         vtime = end-start
         training_time[n_iter-n_min_loop, average_iter] = vtime
-
-
+        
+        # histogram plot
+        plt.figure(0)
+        print(model.layers[-1].get_weights()[0][:,0])
+        plt.boxplot(model.layers[-1].get_weights()[0][:,0]) # wrong!
+        
         y_pred1 = model.predict(X_test, batch_size=batch_size)
         y_pred=np.eye(1, num_classes, k=np.argmax(y_pred1, axis = 1)[0])
         for i in range(1, y_pred1.shape[0]):
@@ -152,17 +143,17 @@ for n_iter in range(n_min_loop, n_max_loop):
         test_loss = history.history['val_loss']
         test_accuracy = history.history['val_accuracy']
         plt.figure(2)
-        plt.title('Linear graphs, classes :'+ str(names))
-        plt.ylim(0.0, y_upper)
+        plt.title('Random, classes :'+ str(names))
+        plt.ylim(0.0, 1.0)
         plt.plot(np.linspace(0.0, len(training_loss), len(training_loss)), training_loss,'--', color = colors[n_iter-n_min_loop], label = 'train loss for ' + str(n_iter) + ' nodes ' + str(round(training_loss[-1],2)))
         plt.plot(np.linspace(0.0, len(test_accuracy), len(test_accuracy)), test_accuracy,'-', color = colors[n_iter-n_min_loop], label = 'test accuracy for ' + str(n_iter) + ' nodes ' + str(round(test_accuracy[-1],2)))
         plt.plot(np.linspace(0.0, len(test_loss), len(test_loss)), test_loss,'-.', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss for ' + str(n_iter) + ' nodes ' + str(round(test_loss[-1],2)))
         plt.xlabel('epochs')
         plt.ylabel('learning performance')
         plt.legend()
-        np.savez(file_name +'/training_results' + str(n_iter), training_loss, test_accuracy, test_loss)
+        np.savez(save_directory +'/training_results' + str(n_iter), training_loss, test_accuracy, test_loss)
 
-        plt.savefig(file_name+'/linear_graphs_cross_entropy_hanna_')
+        plt.savefig(save_directory+'/progress_plot')
 
         grande_training_loss[:, average_iter] = history.history['loss']
         grande_test_accuracy[:, average_iter] = history.history['val_accuracy']
@@ -181,17 +172,17 @@ for n_iter in range(n_min_loop, n_max_loop):
 
 
     plt.figure(1)
-    plt.title('Linear graphs, classes :'+ str(names))
-    plt.ylim(0.0, y_upper)
+    plt.title('Classes :'+ str(names))
+    plt.ylim(0.0, 1.0)
     plt.plot(np.linspace(0.0, len(training_loss), len(training_loss)), training_loss,'--', color = colors[n_iter-n_min_loop], label = 'train loss for ' + str(n_iter) + ' nodes ' + str(round(training_loss[-1],2)))
     plt.plot(np.linspace(0.0, len(test_accuracy), len(test_accuracy)), test_accuracy,'-', color = colors[n_iter-n_min_loop], label = 'test accuracy for ' + str(n_iter) + ' nodes ' + str(round(test_accuracy[-1],2)))
     plt.plot(np.linspace(0.0, len(test_loss), len(test_loss)), test_loss,'-.', color = tuple(t+0.3 for t in colors[n_iter-n_min_loop]), label = 'test loss for ' + str(n_iter) + ' nodes ' + str(round(test_loss[-1],2)))
     plt.xlabel('epochs')
     plt.ylabel('learning performance')
     plt.legend()
-    np.savez(file_name +'/training_results' + str(n_iter), training_loss, test_accuracy, test_loss)
+    np.savez(save_directory +'/training_results' + str(n_iter), training_loss, test_accuracy, test_loss)
 
-    plt.savefig(file_name+'/linear_graphs_cross_entropy_hanna_' + str(average_num))
+    plt.savefig(save_directory+'/resulting_learning_curves_avr' + str(average_num))
     
 
     L = ['n ' + str(n_iter) + '\n' + 
@@ -206,4 +197,4 @@ plt.title('Training time, Hanna code with types:' + str(names)+ ', net_type ' + 
 plt.plot(np.arange(n_min_loop, n_max_loop), training_time_average)
 plt.xlabel('number of nodes')
 plt.ylabel('time in seconds')
-plt.savefig(file_name +'/time_linear_graphs_cross_entropy_hanna' + str(average_num))
+plt.savefig(save_directory +'/time' + str(average_num))

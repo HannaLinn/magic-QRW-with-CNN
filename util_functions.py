@@ -144,8 +144,8 @@ def gen_data(n_max = 10, n = 5, N = 100, random = True, linear = False, cyclic =
     
     current_file_directory = os.path.dirname(os.path.abspath(__file__))
     if linear:
-        np.savez(current_file_directory + '/datasets' + '/linear' + '_n_' + str(n), data_X, data_labels, data_ranking)
+        np.savez(current_file_directory + '/datasets' + '/linear_graph_datasets' + '/train_val_test_data_n_' + str(n), data_X, data_labels, data_ranking)
     elif cyclic:
-        np.savez(current_file_directory + '/datasets' + '/cyclic' + '_n_' + str(n), data_X, data_labels, data_ranking)
+        np.savez(current_file_directory + '/datasets' + '/cyclic_graph_datasets' + '/train_val_test_data_n_' + str(n), data_X, data_labels, data_ranking)
     elif random:
-        np.savez(current_file_directory + '/datasets' + '/random' + '_n_' + str(n), data_X, data_labels, data_ranking)
+        np.savez(current_file_directory + '/datasets' + '/random_graph_datasets' + '/train_val_test_data_n_' + str(n), data_X, data_labels, data_ranking)
