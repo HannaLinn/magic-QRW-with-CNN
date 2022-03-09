@@ -1,5 +1,6 @@
 # magic-QRW-with-CNN
 Detecting quantum speedup for random walks with artificial neural networks
+Download of the thesis: http://kth.diva-portal.org/smash/record.jsf?pid=diva2%3A1522321&dswid=-1046
 
 FILES:
 
