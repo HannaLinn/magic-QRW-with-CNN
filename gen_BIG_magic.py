@@ -11,11 +11,11 @@ current_file_directory = os.path.dirname(os.path.abspath(__file__))
 
 n_min = 25
 n_max = 26
-N = 5000
+N = 2
 
 time_array = np.zeros(n_max - n_min)
 
-for n in range(n_min, n_max):
+for n in [15, 20]:
     start = time.time()
     corpus = Corpus_n(n_max = n, target = 1, initial = 0)
     corpus.generate_graphs(n = n, N = N, percentage = 0, random = True, linear = False, cyclic = False, all_graphs = False, no_ties = False, magic = True)
@@ -32,11 +32,11 @@ for n in range(n_min, n_max):
 
     data_X = data_X.reshape(N, n, n, 1) # [samples, rows, columns, channels]
 
-    end = time.time()
-    timed = end-start
-    time_array[n-n_min] = timed/60
+    #end = time.time()
+    #timed = end-start
+    #time_array[n-n_min] = timed/60
  
-    np.savez(current_file_directory + '/new_magic_results/dataset/' + str(n), data_X, data_labels, data_ranking)
+    np.savez(current_file_directory + '/datasets/' + str(n), data_X, data_labels, data_ranking)
 
     #np.savez(current_file_directory + '/results_magic_corpus_ranking' + '/time_N' + str(N), time_array)
 
