@@ -11,6 +11,9 @@ import numpy as np
 import random
 from graph_simulation import *
 from itertools import permutations
+import random
+import collections
+from itertools import combinations, groupby
 
 
 '''
@@ -28,12 +31,19 @@ class Corpus_n(object):
     where [classical_advantage, quantum_advantage, ...].
     '''
     def __init__(self, n_max, initial = 0, target = 1):
+        self.r_tree=2
+        self.h_tree=3
         self.corpus_list = []
         self.n_max = n_max
         self.initial = initial
         self.target = target
         self.q_count = 0
-    
+        self.steps_q=[]
+        self.steps_c=[]
+        self.wave_c=[]
+        self.wave_q=[]
+
+
     def gen_color_map(self, label, G):
         '''
         Not finished.
@@ -141,15 +151,100 @@ class Corpus_n(object):
         plt.legend()
         plt.savefig('probability_in_t_node' + str(self.n_max))
 
-    def random_graph(self, n):
+
+#which is tree
+
+    def tree(self,n):
         '''
-        Returns a list with [adjecency matrix in the form of a numpy array, nodes in a list].
+        Btree graph: Returns a list with [adjecency matrix in the form of a numpy array, nodes in a list].
         '''
-        top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
-        m = random.randint(n-1, top_edges) # number of edges
+
+        #G = nx.balanced_tree(self.r_tree, self.h_tree, create_using=None)
+        G = nx.balanced_tree(self.r_tree, self.h_tree, create_using=None)
+        N=len(G.nodes)
+        nodelist=list(range(0, N))
+        newnodes=list(range(0, N))
+        random.shuffle(newnodes)  
+        mapping=dict(zip(nodelist,newnodes))
+        
+        G = nx.relabel_nodes(G, mapping)
+        #print(G)
+        d=nx.to_dict_of_lists(G, nodelist=None)
+        dod = collections.OrderedDict(sorted(d.items()))
+        #print('dic=',dod)
+        G = nx.Graph(dod) 
+        A = nx.to_numpy_matrix(G)
+       # print(A)
+       # print(A.todense())
+        
+        return [A, G.nodes()]
+
+
+
+#Hanna_random_graph
+    def Hanna_random_graph(self, n):
+        '''
+        #Returns a list with [adjecency matrix in the form of a numpy array, nodes in a list].
+        '''
+        #top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
+       # m = random.randint(n-1, top_edges) # number of edges
+        #reduce the # of edges 
+        top_edges = 2*n # from Melnikov 2019 p.6  . reduced a lot
+        m = random.randint(int(1.3*n), top_edges) # number of edges
         G = nx.gnm_random_graph(n, m)
         A = nx.to_numpy_matrix(G)
         return [A, G.nodes()]
+
+#    duplication_divergence_graph     
+    def duplication_divergence_graph(self,n):
+        '''
+        #Returns a list with [adjecency matrix in the form of a numpy array, nodes in a list].
+        '''
+        #top_edges = (n**2-n)/2 # from Melnikov 2019 p.6
+       # m = random.randint(n-1, top_edges) # number of edges
+        #reduce the # of edges 
+        p=0.4
+        G=nx.duplication_divergence_graph(n, p, seed=np.random)
+        #print('G=',G.nodes())
+        #print('G=',G.edges())    
+        #mapping = {1: 4,4:1}
+        #new = nx.relabel_nodes(G, mapping)
+        #print('new=',new.nodes())
+        #print('new=',new.edges())   
+        #A = nx.to_numpy_matrix(new)
+        A = nx.to_numpy_matrix(G)
+        #nx.draw(new, pos,connectionstyle='arc3, rad = 0.3', width=2.0,with_labels = True)
+        #plt.show()
+        return [A, G.nodes()]
+        #return [A, new.nodes()]
+
+
+    def random_graph(self,n):
+        """
+        https://stackoverflow.com/questions/61958360/how-to-create-random-graph-where-each-node-has-at-least-1-edge-using-networkx
+        Generates a random undirected graph, similarly to an Erdős-Rényi 
+        graph, but enforcing that the resulting graph is conneted
+        """
+        p=0.05
+        edges = combinations(range(n), 2)
+        G = nx.Graph()
+        G.add_nodes_from(range(n))
+        if p <= 0:
+            return G
+        if p >= 1:
+            return nx.complete_graph(n, create_using=G)
+        for _, node_edges in groupby(edges, key=lambda x: x[0]):
+            node_edges = list(node_edges)
+            random_edge = random.choice(node_edges)
+            G.add_edge(*random_edge)
+            for e in node_edges:
+                if random.random() < p:
+                    G.add_edge(*e)
+        A = nx.to_numpy_matrix(G)
+        return [A, G.nodes()]
+
+
+
 
     def linear_graph(self, n, all_graphs = False, duplicates = False):
         '''
@@ -159,6 +254,7 @@ class Corpus_n(object):
         graph_list = self.gen_linear_graph_lists(n, duplicates)
         return_list = []
         if not (all_graphs or duplicates):
+            #print('not all graphs')
             graph_list = [random.choice(graph_list)]
         for g in graph_list:
             A = np.zeros((n,n))
@@ -167,7 +263,14 @@ class Corpus_n(object):
                 A[g[i+1], g[i]] = 1
             return_list.append([A, g])
         r = return_list if (all_graphs or duplicates) else return_list[0]
+        #print('r0=',r[0])
+
+        #r=return_list
         return r
+
+        #return r[0]
+
+
 
     def cyclic_graph(self, n, all_graphs = False, duplicates = False):
         '''
@@ -175,13 +278,19 @@ class Corpus_n(object):
         Each element in the list has [adjecency matrix in the form of a numpy array, nodes in a list]
         '''
         r = self.linear_graph(n, all_graphs, duplicates)
-        if all_graphs or duplicates:
-            for A in r:
-                A[0][g[0], g[n-1]] = 1
-                A[0][g[n-1], g[0]] = 1
-        else:
-            r[0][g[0], g[n-1]] = 1
-            r[0][g[n-1], g[0]] = 1
+     #   print('r=',r)
+     #   print('r[0]=',r[0])
+       # print('r[1]=',r[1])
+
+                    #Yu:      
+
+        A=r[0]
+        g=r[1]
+       # print('A',A)
+       # print('g',g)           
+        A[int(g[0]), int(g[n-1])] = 1
+        A[int(g[n-1]), int(g[0])] = 1  
+
         return r
 
     def gen_linear_graph_lists(self, n, duplicates = False):
@@ -223,7 +332,7 @@ class Corpus_n(object):
                         node_list[i] = self.initial
         return grande_list
 
-    def generate_graphs(self, n, N = 10, verbose = False, percentage = False, random = True, linear = False, all_graphs = False, duplicates = False, cyclic = False, no_ties = False, magic = False):
+    def generate_graphs(self, n, N = 10, verbose = False, percentage = False, random = True, linear = False, Btree=False, all_graphs = False, duplicates = False, cyclic = False, no_ties = False, magic = False):
         '''
         Not setting a percentage is faster and will lead to 15% quantum in the random case.
 
@@ -238,10 +347,18 @@ class Corpus_n(object):
             random = False
             if linear:
                 graph_list = self.linear_graph(n, all_graphs, duplicates)
+            elif Btree:
+                graph_list = self.BTree_graph(n, all_graphs, duplicates)
             elif cyclic:
                 graph_list = self.cyclic_graph(n, all_graphs, duplicates)
+
             for graph in graph_list:
-                self.corpus_list.append(GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic))
+                walk=GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic)
+                self.corpus_list.append(walk)
+                self.steps_q.append(walk.q_hitting_time)
+                self.wave_q.append(walk.p_q)
+                self.wave_c.append(walk.p_c)
+                self.steps_c.append(walk.c_hitting_time)                
             for l in self.corpus_list:
                 if l.label[1] == 1.0:
                 	self.q_count += 1
@@ -256,15 +373,16 @@ class Corpus_n(object):
                         graph = self.linear_graph(n)
                     if cyclic:
                         graph = self.cyclic_graph(n)
-                    
+                    if Btree:
+                        graph = self.BTree_graph(n)                    
                     # adding ghost nodes not connected
-                    for ghost_node in range(self.n_max - n):
-                        A = np.c_[A, np.zeros((n+ghost_node, 1))]
-                        A = np.r_[A, np.zeros((1, n+ghost_node+1))]
+ 
                     
                     gcat = GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic)
-                    
-                    
+                    self.steps_q.append(gcat.q_hitting_time)
+                    self.steps_c.append(gcat.c_hitting_time)                       
+                    self.wave_q.append(gcat.p_q)
+                    self.wave_c.append(gcat.p_c)
                     if no_ties:
                         if np.sum(gcat.label) == 1: # throw away tie
                             self.corpus_list.append(gcat)
@@ -288,15 +406,17 @@ class Corpus_n(object):
                         graph = self.linear_graph(n)
                     if cyclic:
                         graph = self.cyclic_graph(n)
-                    
+                    if Btree:
+                        graph = self.BTree_graph(n)                    
                     # adding ghost nodes not connected
-                    for ghost_node in range(self.n_max - n):
-                        A = np.c_[A, np.zeros((n+ghost_node, 1))]
-                        A = np.r_[A, np.zeros((1, n+ghost_node+1))]
+
                     
                     # categorise
                     gcat = GraphSimulation(graph, initial = self.initial, target = self.target, magic = magic)
-                    
+                    self.steps_q.append(gcat.q_hitting_time)
+                    self.steps_c.append(gcat.c_hitting_time)   
+                    self.wave_q.append(gcat.p_q)
+                    self.wave_c.append(gcat.p_c)
                     if np.sum(gcat.label) == 1: # throw away tie
                         if gcat.label[1] > 0: # if quantum, gcat.label = [classical_advantage, quantum_advantage]
                             if self.q_count/N < percentage:

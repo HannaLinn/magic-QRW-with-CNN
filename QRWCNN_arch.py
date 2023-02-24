@@ -211,8 +211,8 @@ class ETE_ETV_Net(tf.keras.Model):
         
         model.summary()
         
-        opt = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
-        #opt = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
+        #opt = keras.optimizers.SGD(lr=0.0001, momentum=0.9, nesterov=True)
+        opt = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
 
         model.compile(optimizer = opt,
                       loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False),
