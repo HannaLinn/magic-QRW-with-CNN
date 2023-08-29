@@ -278,18 +278,17 @@ class Corpus_n(object):
         Each element in the list has [adjecency matrix in the form of a numpy array, nodes in a list]
         '''
         r = self.linear_graph(n, all_graphs, duplicates)
-     #   print('r=',r)
-     #   print('r[0]=',r[0])
-       # print('r[1]=',r[1])
-
-                    #Yu:      
-
-        A=r[0]
-        g=r[1]
-       # print('A',A)
-       # print('g',g)           
-        A[int(g[0]), int(g[n-1])] = 1
-        A[int(g[n-1]), int(g[0])] = 1  
+        if len(r) > 2:
+            for i in r:
+                A=i[0]
+                g=i[1]         
+                A[int(g[0]), int(g[n-1])] = 1
+                A[int(g[n-1]), int(g[0])] = 1  
+        else:
+            A=r[0]
+            g=r[1]       
+            A[int(g[0]), int(g[n-1])] = 1
+            A[int(g[n-1]), int(g[0])] = 1  
 
         return r
 
