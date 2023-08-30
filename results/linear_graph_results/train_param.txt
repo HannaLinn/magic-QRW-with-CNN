@@ -1,0 +1,4 @@
+batch_size: 100
+epochs: 1000
+train (N, n, n, C): (6700, 15, 15, 1) q_percentage: 0.07
+test (N, n, n, C): (2800, 15, 15, 1) q_percentage: 0.07

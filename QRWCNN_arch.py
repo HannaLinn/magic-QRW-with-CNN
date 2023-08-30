@@ -205,15 +205,14 @@ class ETE_ETV_Net(tf.keras.Model):
             z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z) # according to Melnikov code self.fc3, line 93 in cnn_arch
             for i in range(self.depth_of_dense):
                 z = tf.keras.layers.Dense(self.num_neurons, activation = 'relu')(z)
-            outlayer = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')
-            out = outlayer(z)
+            out = tf.keras.layers.Dense(self.num_classes, activation = 'softmax')(z)
 
         model = tf.keras.models.Model(inputs, out)
         
         model.summary()
         
-        opt = keras.optimizers.SGD(lr=0.001, momentum=0.9, nesterov=True)
-        #opt = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
+        #opt = keras.optimizers.SGD(lr=0.0001, momentum=0.9, nesterov=True)
+        opt = keras.optimizers.Adam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8)
 
         model.compile(optimizer = opt,
                       loss = tf.keras.losses.CategoricalCrossentropy(from_logits=False),

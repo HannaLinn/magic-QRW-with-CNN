@@ -8,6 +8,7 @@ Created on Wed Aug 12 17:58:59 2020
 import numpy as np
 import qutip as qt
 from scipy.linalg import expm
+from scipy.stats import rankdata
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
@@ -20,7 +21,7 @@ class GraphSimulation():
     Args:
             initial : initial vertex for the start of random walk (integer) default 0
             target : target vertex for the finish of the quantum walk (integer) default 1
-            A : is a nxn numpy array of the adjecency matrix
+            graph : [A, node_list] A is a nxn numpy array of the adjecency matrix, node_list is the list of nodes
             label : numpy array of [classical_advantage, quantum_advantage] as a float
                     [1.0, 0.0] is classical
                     [0.0, 1.0] is quantum
@@ -33,48 +34,59 @@ class GraphSimulation():
         self.node_list = graph[1]
         self.magic = magic
         self.step_size = step_size
-        #self.max_time = step_size * 1000 * self.n
-        self.max_time = 1000 * self.n
+        self.max_time = step_size * 100 * self.n
+        self.max_steps = 100 * self.n
         self.initial = initial
         self.target = target
         self.pth = 1/np.log(self.n)
         
-        self.pc_hitting_time, self.pc = self.CRW_simulation() # run until finished or max_time
+        self.c_hitting_time, self.p_c = self.CRW_simulation() # run until finished or max_time
         
-        self.pq_q_hitting_time, self.pq_q = self.QRW_simulation(ancilla = False) # vanilla
-
+        self.q_hitting_time, self.p_q = self.QRW_simulation(ancilla = False) # vanilla
+        
         if self.magic:
-            self.pq_pos_hitting_time, self.pq_pos = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'positive')
-            self.pq_neg_hitting_time, self.pq_neg = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'negative')
-            self.pq_T_hitting_time, self.pq_T = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'T')
-            self.pq_H_hitting_time, self.pq_H = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'H')
-            self.names = ['c', 'q', 'pos', 'neg', 'T', 'H']
+            self.positive_hitting_time, self.p_positive = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'positive')
+            self.negative_hitting_time, self.p_negative = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'negative')
+            self.T_hitting_time, self.p_T = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'T')
+            self.H_hitting_time, self.p_H = self.QRW_simulation(ancilla = True, connection = 'bidirected', split = False, superposition = 'H')
+            self.names = ['c', 'q', 'positive', 'negative', 'T', 'H']
             self.colors = ['grey', 'magenta', 'cyan', 'yellow', 'red', 'blue']
         else:
             self.names = ['c', 'q']
             self.colors = ['grey', 'magenta']
 
-        self.hitting_time_all = np.array([self.pc_hitting_time])
-        self.p_all = np.array([self.pc])
+        self.hitting_time_all = self.c_hitting_time
+        self.p_all = [self.p_c]
         for name in self.names[1:]:
-            self.hitting_time_all = np.append(self.hitting_time_all, eval('self.pq_' + name + '_hitting_time'))
-            self.p_all = np.append(self.p_all, eval('self.pq_' + name))
-        #self.hitting_time_all = np.array([self.pc_hitting_time, self.pq_hitting_time, self.pq_pos_hitting_time, self.pq_neg_hitting_time, self.pq_T_hitting_time, self.pq_H_hitting_time])
-        #self.p_all = [self.pc, self.pq, self.pq_pos, self.pq_neg, self.pq_T, self.pq_H]
+            self.hitting_time_all = np.append(self.hitting_time_all, eval('self.' + name + '_hitting_time'), axis = 1)
+            self.p_all.append(eval('self.p_' + name))
         self.set_label()
         self.set_ranking()
 
     def set_label(self):
-        self.label = np.where(self.hitting_time_all == self.hitting_time_all.min(), 1.0, 0.0)
+        temp = np.where(self.hitting_time_all[1, :], self.hitting_time_all[0, :], self.max_time)
+        self.label = np.where(temp == temp.min(), 1.0, 0.0) # to get the ties
 
     def set_ranking(self):
-        pass
+        temp = np.where(self.hitting_time_all[1, :], self.hitting_time_all[0, :], self.max_time)
+        self.ranking = rankdata(temp, method = 'dense')
+
+        prob_at_end = np.array([x[-1, -1] for x in self.p_all])
+        if self.magic:
+            for i in range(2,6):
+                prob_at_end[i] = self.p_all[i][-1, self.n] # sink instead of extra node
+
+        not_found = np.where(np.where(self.hitting_time_all[1, :] == 0., True, False), prob_at_end, 0) # [0, 30, 0, 0, 20, 0]
+        for l in range(np.sum(np.where(self.hitting_time_all[1, :] == 0., True, False))): # falses should be last in ranking
+            idx = np.argmax(not_found)
+            self.ranking[idx] = np.amax(self.ranking) if l == 0 else np.amax(self.ranking) + 1
+            not_found[idx] = 0
 
     
     def CRW_simulation(self):
-        pc_hitting_time = 0
-        pc = np.zeros((1, self.n)) # classical probability, dim=(time, node)
-        pc[0, self.initial] = 1
+        c_hitting_time = 0
+        p_c = np.zeros((1, self.n)) # classical probability, dim=(time, node)
+        p_c[0, self.initial] = 1
         Ac = np.copy(self.A)
         Ac[:, self.target] = 0
         Ac[self.target, self.target] = 1
@@ -90,16 +102,16 @@ class GraphSimulation():
             temp1 = np.exp(-t)
             temp2 = expm(T*t)
             temp3 = np.dot(temp2, p0)*temp1 #eq (3) Melnikov 1
-            pc = np.append(pc, np.reshape(temp3, (1, self.n)), axis = 0)
+            p_c = np.append(p_c, np.reshape(temp3, (1, self.n)), axis = 0)
             prob = temp3[self.target]
             t = round(t + self.step_size, 6)
-        pc_hitting_time = t
-        self.t_steps = int(np.ceil(pc_hitting_time / self.step_size))
-        self.t = np.linspace(0.0, pc_hitting_time, self.t_steps)
-        return pc_hitting_time, pc
+        c_hitting_time = t
+        self.t_steps = int(np.ceil(c_hitting_time / self.step_size))
+        found = p_c[self.t_steps-1, self.target] > self.pth
+        return np.array([[c_hitting_time], [found]]), p_c
 
 
-    def QRW_simulation(self, gamma = 1, ancilla = False, connection = 'bidirected', split = False, superposition = 'positive', verbose = False):
+    def QRW_simulation(self, gamma = 1, ancilla = False, connection = 'bidirected', split = False, superposition = 'no superposition', verbose = False):
         '''
         Args:
                 connection : 'ghost' (not connected ancillary node, only with split), or
@@ -110,9 +122,7 @@ class GraphSimulation():
                               'negative' |-> = sqrt(1/2) * (|i> - |e>)
                               'T' where T_state = cos(beta) * |i> + exp(1j*(pi/4)) * sin(beta) * |e>, beta = 0.5 * arccos(1/sqrt(3))), or
                               'H' where H_state = cos(np.pi/8) * |i> + sin(np.pi/8) * |e>).
-        '''
-        pq_hitting_time = self.step_size * 1000 * self.n
-        pq = np.zeros((self.t_steps, self.n+1)) # quantum probability, dim=(time, node+1), +1 for sink
+        '''        
         Aq = np.copy(self.A)
         Aq = np.concatenate((Aq, np.zeros((self.n, 1))), axis = 1) # adding sink
         Aq = np.concatenate((Aq, np.zeros((1, self.n+1))), axis = 0) # adding sink
@@ -134,8 +144,6 @@ class GraphSimulation():
                     if self.A[row, self.initial]:
                         Aq[self.extra, row] = 1
                         Aq[row, self.extra] = 1
-            else:
-                pass
 
             if superposition == 'positive':
                 rho = np.sqrt(1/2) * (qt.basis(nq_dim, self.initial) + qt.basis(nq_dim, self.extra))
@@ -151,7 +159,6 @@ class GraphSimulation():
             rho0 = rho * rho.dag()
 
             if verbose:
-                #print('Aq: ', Aq)
                 qt.hinton(rho0)
                 plt.title(superposition)
                 plt.show()
@@ -163,35 +170,38 @@ class GraphSimulation():
         H = qt.Qobj(Aq)
         L = qt.basis(nq_dim, self.sink) * qt.basis(nq_dim, self.target).dag() # L = |n+1><t|, but with zero indexing
         c_op = np.sqrt(gamma) * L # collapse op C = sqrt(gamma)*L
-        options = qt.Options(nsteps=1500, store_states=True, atol=1e-12, rtol=1e-12)
-        result = qt.mesolve(H, rho0, self.t, c_op, options = options) # solves the master eq
+        options = qt.Options(store_states=True, atol=1e-12, rtol=1e-12)
         
-        found = False
-        for t in range(self.t_steps):
-            pq[t, :] = result.states[t].full().diagonal()[:self.sink+1].real # diagonal is the probability for the different nodes
-            prob = result.states[t].full().diagonal()[self.sink].real
-            if (prob > self.pth) and (not found):
-                pq_hitting_time = round(t * self.step_size, 6)
-                found = True
 
-        return pq_hitting_time, pq
+        result = qt.mesolve(H, rho0, np.linspace(0, self.max_time, self.max_steps), c_op, options = options) # solves the master eq
+
+        p_q = [s.diag().real for s in result.states]
+        p_q = np.array(p_q)
+        q_hitting_step = np.argmax(p_q[:, self.sink] > self.pth)
+        self.t_steps = q_hitting_step if self.t_steps < q_hitting_step else self.t_steps
+        q_hitting_time = round(q_hitting_step*self.step_size, 6) if p_q[q_hitting_step, self.sink] != 0 else np.argmax(p_q[:, self.sink])
+        found = p_q[q_hitting_step, self.sink] > self.pth
+
+        return np.array([[q_hitting_time], [found]]), p_q
                 
     
     def plot_p(self):
-        plt.plot(self.t, self.pc[:, self.target], '--', label = self.names[0], c = self.colors[0])
-        for i in range(1, len(self.p_all)-1):
+        for i in range(1, len(self.p_all)):
             p = self.p_all[i]
-            plt.plot(self.t, p[:, -1], label = self.names[i], c = self.colors[i])
-        plt.title('Probability in the target (sink) node, labeled ' + str(self.label))
+            plt.plot(np.linspace(0, p.shape[0], p.shape[0]), p[:, self.sink], label = self.names[i], c = self.colors[i])
+        p = self.p_c[:, self.target]
+        plt.plot(np.linspace(0, p.shape[0], p.shape[0]), p, '-.', label = self.names[0], c = self.colors[0])
+        plt.title('Probability in the target(sink), label:' + str(self.label) + ', ranking:' +str(self.ranking))
         plt.xlabel('time')
         plt.ylabel('probability')
-        plt.plot(self.t, np.ones(self.t_steps)*self.pth, '.', color = (0, 0, 0), label = 'pth')
+        plt.plot(np.linspace(0, self.max_steps,self.max_steps), np.ones(self.max_steps)*self.pth, '--', color = (0, 0, 0), label = 'pth')
         plt.legend()
+        plt.savefig('probability_n'+str(self.n)+'_R' + str(np.random.randint(0,100)) )
 
     def animate_p(self, p_list = [0, 1]):
         '''
         Animate the probabilities given in p_list over the nodes.
-        [0, 1] are pc and pq.
+        [0, 1] are p_c and p_q.
         ['c', 'q', 'pos', 'neg', 'T', 'H'] use the indices for the rest.
         p_list = 'all' gives all probabilities.
         '''
@@ -202,13 +212,17 @@ class GraphSimulation():
         fig = plt.figure()
         ax = plt.axes(xlim=(0, self.n-1), ylim=(-0.1, 1.0))
         pthline = ax.plot([], [], lw=2, label= 'threshold', c = 'black')[0]
-        target = ax.plot([], [], mew=7, label = 'target', c = 'r', marker = 'o')[0]
+        if p_list == [0]:
+            target = ax.plot([], [], mew=7, label = 'target', c = 'r', marker = 'o')[0]
+        else:
+            target = ax.plot([], [], mew=7, label = 'target/sink', c = 'r', marker = 'o')[0]
         initial = ax.plot([], [], mew=7, label = 'initial', c = 'y', marker = 'v')[0]
         line_list = []
         for p in p_list:
             line_list.append(ax.plot([], [], lw=2, label= self.names[p], c = self.colors[p])[0])
         ax.set_xlabel('nodes')
         ax.set_ylabel('probability')
+        ax.set_yticks([0, 0.5, 1.0])
         plt.title('Probability over a linear graph with label ' + str(self.label))
         plt.legend()
 
@@ -228,12 +242,12 @@ class GraphSimulation():
             p_return = []
             for p in enumerate(p_list):
                 if p[1] == 0:
-                    pc_anim = self.pc[t,:][np.array(self.node_list)]
-                    line_list[0].set_data(np.arange(0, self.n), pc_anim)
+                    p_c_anim = self.p_c[t,:][np.array(self.node_list)]
+                    line_list[0].set_data(np.arange(0, self.n), p_c_anim)
                 else: # sink instead of target
-                    pq_p = eval('self.pq_' + self.names[p[0]])
-                    anim = np.copy(pq_p[:, :self.n]) 
-                    anim[:, self.target] = pq_p[:, self.sink] 
+                    p_q = eval('self.p_' + self.names[p[0]])
+                    anim = np.copy(p_q[:, :self.n]) 
+                    anim[:, self.target] = p_q[:, self.sink] 
                     anim = anim[t, :][np.array(self.node_list)] 
             
                     line_list[p[0]].set_data(np.arange(0, self.n), anim)
@@ -246,16 +260,25 @@ class GraphSimulation():
 
             return target, initial, pthline, p_return
 
-
         # call the animator.  blit=True means only re-draw the parts that have changed.
-        anim = animation.FuncAnimation(fig, animate, init_func=init,
-                                       frames=self.t_steps, interval=1, repeat=True)
+        frames = self.t_steps
+        for i in p_list:
+            frames = self.p_all[i].shape[0] if self.p_all[i].shape[0] < frames else frames
 
-        #plt.show()
-        #plt.savefig("./plot.png")             # store final frame
-        #anim.save('wavepacketanimation'+ str(self.n) + '.gif', writer='imagemagick', fps=30)
+
+        anim = animation.FuncAnimation(fig, animate, init_func=init,
+                                       frames=frames, interval=1, repeat=True)
+
         # Set up formatting for the movie files
         Writer = animation.writers['ffmpeg']
-        writer = Writer(fps=20, metadata=dict(artist='Me'), bitrate=1800)
-        anim.save('wavepacketanimation'+ str(self.n) + '_R' + str(np.random.randint(0,100)) + '.mp4', writer=writer) # give a random number to save all movies
+        writer = Writer(fps=40, metadata=dict(artist='Me'), bitrate=1800)
+        anim.save('probability_wave_n'+ str(self.n) + '_R' + str(np.random.randint(0,100)) + '.mp4', writer=writer) # give a random number to save all movies
+        #plt.savefig('probability_wave_n'+ str(self.n) + '_R' + str(np.random.randint(0,100)) + "plot.png")
+
+        '''
+        anim = animation.FuncAnimation(fig, animate, init_func=init,
+                                       frames=20, interval=1, repeat=True)
+        anim.save('probability_wave_n'+ str(self.n) + '_R' + str(np.random.randint(0,100)) + '.mp4', writer=writer) # give a random number to save all movies
+        plt.savefig('probability_wave_n'+ str(self.n) + '_R' + str(np.random.randint(0,100)) + "plot.png")
+        '''
 
