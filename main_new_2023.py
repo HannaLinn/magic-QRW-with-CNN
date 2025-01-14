@@ -262,10 +262,22 @@ for j in [6]:
 '''
 
 # träna på 20 och 6, testa på alla andra
+import time
+
+start_time = time.time()
 
 linear_cyclic = 'linear_'
+test_j = 0
 
 for j in [6, 20]:
+    # time each loop
+    start_time_loop = time.time()
+    end_time_loop = time.time()
+    elapsed_time_loop = end_time_loop - start_time_loop
+    elapsed_minutes_loop = elapsed_time_loop / 60
+    print(f"Elapsed time loop : {elapsed_minutes_loop:.2f} minutes")
+    print("test_j: ", test_j)
+    print("j: ", j)
     # ------------------------------------------------------------- 
     for arch in [1,2,3]:
 
@@ -280,7 +292,7 @@ for j in [6, 20]:
                 main(num = arch, now_testing = now_testing, comp_list = comp_list, net_type = arch, num_nodes = j, generalisation = False, num_nodes_test = test_j)
             else:
                 main(num = arch, now_testing = now_testing, comp_list = comp_list, net_type = arch, num_nodes = j, generalisation = True, num_nodes_test = test_j)
-            
+
         if j == 20:
             test_j = 25
 
@@ -292,5 +304,11 @@ for j in [6, 20]:
             
 
 
+
 # ------------------------------------------------
 print('-'*20, ' DONE ', '-'*20)
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+elapsed_minutes = elapsed_time / 60
+print(f"Elapsed time: {elapsed_minutes:.2f} minutes")
